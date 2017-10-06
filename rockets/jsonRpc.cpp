@@ -19,7 +19,9 @@
 
 #include "jsonRpc.h"
 
-#include "jsoncpp/json/json.h"
+#include "jsoncpp/json11.hpp"
+
+using namespace json11;
 
 #include <map>
 
@@ -32,88 +34,48 @@ const char* reservedMethodError =
     "Method names starting with 'rpc.' are "
     "reserved by the standard / forbidden.";
 
-Json::Value _parse(const std::string& json)
+Json makeParseErrorObject()
 {
-    Json::Value document;
-    const auto builder = Json::CharReaderBuilder();
-    auto reader = std::unique_ptr<Json::CharReader>{builder.newCharReader()};
-    reader->parse(json.c_str(), json.c_str() + json.size(), &document, nullptr);
-    return document;
+    return Json::object{{"code", -32700}, {"message", "Parse error"}};
 }
 
-std::string to_string(const Json::Value& json)
+Json makeInvalidRequestObject()
 {
-    auto factory = Json::StreamWriterBuilder();
-    factory["indentation"] = "    ";
-    factory["enableYAMLCompatibility"] = true;
-    return Json::writeString(factory, json);
+    return Json::object{{"code", -32600}, {"message", "Invalid Request"}};
 }
 
-Json::Value makeParseErrorObject()
+Json makeMethodNotFoundObject()
 {
-    auto error = Json::Value{Json::objectValue};
-    error["code"] = -32700;
-    error["message"] = "Parse error";
-    return error;
+    return Json::object{{"code", -32601}, {"message", "Method not found"}};
 }
 
-Json::Value makeInvalidRequestObject()
+Json _makeErrorResponse(const Json& error, const Json& id = Json())
 {
-    auto error = Json::Value{Json::objectValue};
-    error["code"] = -32600;
-    error["message"] = "Invalid Request";
-    return error;
+    return Json::object{{"jsonrpc", "2.0"}, {"error", error}, {"id", id}};
 }
 
-Json::Value makeMethodNotFoundObject()
+Json _makeErrorResponse(const int code, const std::string& message,
+                        const Json& id = Json())
 {
-    auto error = Json::Value{Json::objectValue};
-    error["code"] = -32601;
-    error["message"] = "Method not found";
-    return error;
+    return Json::object{{"jsonrpc", "2.0"},
+                        {"code", code},
+                        {"message", message},
+                        {"id", id}};
 }
 
-Json::Value _makeJsonRpcObject()
+Json _makeResponse(const std::string& result, const Json& id)
 {
-    auto response = Json::Value{Json::objectValue};
-    response["jsonrpc"] = "2.0";
-    return response;
+    return Json::object{{"jsonrpc", "2.0"}, {"result", result}, {"id", id}};
 }
 
-Json::Value _makeErrorResponse(const Json::Value& error,
-                               const Json::Value& id = Json::Value())
-{
-    auto response = _makeJsonRpcObject();
-    response["error"] = error;
-    response["id"] = id;
-    return response;
-}
-
-Json::Value _makeErrorResponse(const int code, const std::string& message,
-                               const Json::Value& id = Json::Value())
-{
-    auto error = Json::Value{Json::objectValue};
-    error["code"] = code;
-    error["message"] = message;
-    return _makeErrorResponse(error, id);
-}
-
-Json::Value _makeResponse(const std::string& result, const Json::Value& id)
-{
-    auto response = _makeJsonRpcObject();
-    response["result"] = result;
-    response["id"] = id;
-    return response;
-}
-
-bool _isValidJsonRpcRequest(const Json::Value& object)
+bool _isValidJsonRpcRequest(const Json& object)
 {
     const auto params = object["params"];
-    return object["jsonrpc"].asString() == "2.0" &&
-           object["method"].isString() &&
-           (params.isNull() || params.isObject() || params.isArray()) &&
-           (object["id"].isNull() || object["id"].isDouble() ||
-            object["id"].isString());
+    return object["jsonrpc"].string_value() == "2.0" &&
+           object["method"].is_string() &&
+           (params.is_null() || params.is_object() || params.is_array()) &&
+           (object["id"].is_null() || object["id"].is_number() ||
+            object["id"].is_string());
 }
 
 inline bool begins_with(const std::string& string, const std::string& other)
@@ -125,45 +87,44 @@ inline bool begins_with(const std::string& string, const std::string& other)
 class JsonRpc::Impl
 {
 public:
-    std::string processBatchBlocking(const Json::Value& array)
+    std::string processBatchBlocking(const Json& array)
     {
-        if (array.empty())
-            return to_string(_makeErrorResponse(makeInvalidRequestObject()));
+        if (array.array_items().empty())
+            return _makeErrorResponse(makeInvalidRequestObject()).dump();
 
-        return to_string(processValidBatchBlocking(array));
+        return processValidBatchBlocking(array).dump();
     }
 
-    Json::Value processValidBatchBlocking(const Json::Value& array)
+    Json processValidBatchBlocking(const Json& array)
     {
-        Json::Value responses;
-        for (const auto& entry : array)
+        std::vector<Json> responses;
+        for (const auto& entry : array.array_items())
         {
-            if (entry.isObject())
+            if (entry.is_object())
             {
                 const auto response = processCommandBlocking(entry);
-                if (!response.empty())
-                    responses.append(response);
+                if (!response.is_null())
+                    responses.push_back(response);
             }
             else
-                responses.append(
+                responses.push_back(
                     _makeErrorResponse(makeInvalidRequestObject()));
         }
-        return responses;
+        return Json{responses};
     }
 
-    Json::Value processCommandBlocking(const Json::Value& request)
+    Json processCommandBlocking(const Json& request)
     {
-        auto promise = std::make_shared<std::promise<Json::Value>>();
+        auto promise = std::make_shared<std::promise<Json>>();
         auto future = promise->get_future();
-        auto callback = [promise](Json::Value response) {
+        auto callback = [promise](Json response) {
             promise->set_value(std::move(response));
         };
         processCommand(request, callback);
         return future.get();
     }
 
-    void processCommand(const Json::Value& request,
-                        std::function<void(Json::Value)> callback)
+    void processCommand(const Json& request, std::function<void(Json)> callback)
     {
         if (!_isValidJsonRpcRequest(request))
         {
@@ -172,8 +133,8 @@ public:
         }
 
         const auto id = request["id"];
-        const auto methodName = request["method"].asString();
-        const auto params = to_string(request["params"]);
+        const auto methodName = request["method"].string_value();
+        const auto params = request["params"].dump();
 
         const auto method = methods.find(methodName);
         if (method == methods.end())
@@ -185,9 +146,9 @@ public:
         const auto& func = method->second;
         func(params, [callback, id](const JsonRpc::Response rep) {
             // No reply for valid "notifications" (requests without an "id")
-            if (id.isNull())
+            if (id.is_null())
             {
-                callback(Json::Value());
+                callback(Json());
                 return;
             }
 
@@ -259,17 +220,18 @@ std::future<std::string> JsonRpc::processAsync(const std::string& request)
 
 void JsonRpc::process(const std::string& request, ProcessAsyncCallback callback)
 {
-    const auto document = _parse(request);
-    if (document.isObject())
+    std::string err;
+    const auto document = Json::parse(request, err);
+    if (document.is_object())
     {
-        auto stringifyCallback = [callback](const Json::Value obj) {
-            callback(to_string(obj));
+        auto stringifyCallback = [callback](const Json obj) {
+            callback(obj.dump());
         };
         _impl->processCommand(document, stringifyCallback);
     }
-    else if (document.isArray())
+    else if (document.is_array())
         callback(_impl->processBatchBlocking(document));
     else
-        callback(to_string(_makeErrorResponse(makeParseErrorObject())));
+        callback(_makeErrorResponse(makeParseErrorObject()).dump());
 }
 }
