@@ -42,7 +42,7 @@
 #include <boost/test/unit_test.hpp>
 
 #include "rockets/jsonRpc.h"
-#include "rockets/jsoncpp/json/json.h"
+#include "rockets/json.hpp"
 
 #include <thread>
 
@@ -96,7 +96,7 @@ const std::string substractResultStringId{
     "result": "19"
 })"};
 
-const std::string notifyStandardReply{
+const std::string connectStandardReply{
     R"({
     "id": 3,
     "jsonrpc": "2.0",
@@ -198,36 +198,29 @@ const std::string invalidBatch3RequestResult{
 ])"};
 }
 
-Json::Value _parse(const std::string& json)
-{
-    Json::Value document;
-    const auto builder = Json::CharReaderBuilder();
-    auto reader = std::unique_ptr<Json::CharReader>{builder.newCharReader()};
-    reader->parse(json.c_str(), json.c_str() + json.size(), &document, nullptr);
-    return document;
-}
-
 using namespace rockets;
 
 JsonRpc::Response substractObj(const std::string& params)
 {
-    const auto object = _parse(params);
+    const auto object = nlohmann::json::parse(params);
 
-    if (!object["minuend"].isDouble() || !object["subtrahend"].isDouble())
+    if (!object.count("minuend") || !object["minuend"].is_number() ||
+        !object.count("subtrahend") || !object["subtrahend"].is_number())
         return JsonRpc::Response::invalidParams();
 
-    const auto value = object["minuend"].asInt() - object["subtrahend"].asInt();
+    const auto value =
+        object["minuend"].get<int>() - object["subtrahend"].get<int>();
     return {std::to_string(value)};
 }
 
 JsonRpc::Response substractArr(const std::string& params)
 {
-    const auto array = _parse(params);
+    const auto array = nlohmann::json::parse(params);
 
-    if (array.size() != 2 || !array[0].isDouble() || !array[1].isDouble())
+    if (array.size() != 2 || !array[0].is_number() || !array[1].is_number())
         return JsonRpc::Response::invalidParams();
 
-    const auto value = array[0].asInt() - array[1].asInt();
+    const auto value = array[0].get<int>() - array[1].get<int>();
     return {std::to_string(value)};
 }
 
@@ -247,12 +240,13 @@ struct Operands
 };
 bool from_json(Operands& op, const std::string& json)
 {
-    const auto object = _parse(json);
+    const auto object = nlohmann::json::parse(json);
 
-    if (!object["minuend"].isDouble() || !object["subtrahend"].isDouble())
+    if (!object.count("minuend") || !object["minuend"].is_number() ||
+        !object.count("subtrahend") || !object["subtrahend"].is_number())
         return false;
-    op.left = object["minuend"].asInt();
-    op.right = object["subtrahend"].asInt();
+    op.left = object["minuend"].get<int>();
+    op.right = object["subtrahend"].get<int>();
     return true;
 }
 
@@ -324,14 +318,14 @@ BOOST_FIXTURE_TEST_CASE(bind_async_with_params, Fixture)
     BOOST_CHECK_EQUAL(jsonRpc.process(substractArray), invalidParamsResult);
 }
 
-BOOST_FIXTURE_TEST_CASE(notify_with_params, Fixture)
+BOOST_FIXTURE_TEST_CASE(connect_with_params, Fixture)
 {
     int called = 0;
-    jsonRpc.notify<Operands>("subtract", [&called](const Operands op) {
+    jsonRpc.connect<Operands>("subtract", [&called](const Operands op) {
         BOOST_CHECK(op.left == 42 && op.right == 23);
         ++called;
     });
-    BOOST_CHECK_EQUAL(jsonRpc.process(substractObject), notifyStandardReply);
+    BOOST_CHECK_EQUAL(jsonRpc.process(substractObject), connectStandardReply);
     BOOST_CHECK_EQUAL(jsonRpc.process(substractArray), invalidParamsResult);
     BOOST_CHECK_EQUAL(called, 1);
 }
@@ -345,9 +339,9 @@ BOOST_FIXTURE_TEST_CASE(reserved_method_names, Fixture)
     BOOST_CHECK_THROW(jsonRpc.bind("rpc.xyz", bindFunc), std::invalid_argument);
     BOOST_CHECK_THROW(jsonRpc.bindAsync("rpc.abc", bindAsyncFunc),
                       std::invalid_argument);
-    BOOST_CHECK_THROW(jsonRpc.notify("rpc.", [](const std::string&) {}),
+    BOOST_CHECK_THROW(jsonRpc.connect("rpc.", [](const std::string&) {}),
                       std::invalid_argument);
-    BOOST_CHECK_THROW(jsonRpc.notify("rpc.void", [] {}), std::invalid_argument);
+    BOOST_CHECK_THROW(jsonRpc.connect("rpc.void", [] {}), std::invalid_argument);
 
     BOOST_CHECK_NO_THROW(jsonRpc.bind("RPC.xyz", bindFunc));
     BOOST_CHECK_NO_THROW(jsonRpc.bind("rpc", bindFunc));

@@ -60,16 +60,16 @@ public:
     /** @name Asynchronous response to a request. */
     //@{
     using AsyncResponse = std::function<void(Response)>;
-    using ProcessAsyncCallback = std::function<void(std::string)>;
+    using AsyncStringResponse = std::function<void(std::string)>;
     //@}
 
     /** @name Callbacks that can be registered. */
     //@{
-    using ResponseCallback = std::function<Response(const std::string&)>;
-    using ResponseCallbackAsync =
-        std::function<void(const std::string&, AsyncResponse)>;
-    using NotifyCallback = std::function<void(const std::string&)>;
     using VoidCallback = std::function<void()>;
+    using NotifyCallback = std::function<void(const std::string&)>;
+    using ResponseCallback = std::function<Response(const std::string&)>;
+    using DelayedResponseCallback =
+        std::function<void(const std::string&, AsyncResponse)>;
     //@}
 
     /** Constructor. */
@@ -77,6 +77,52 @@ public:
 
     /** Destructor. */
     ~JsonRpc();
+
+    /**
+     * Connect a method to a callback with no response and no payload.
+     *
+     * This is a convienience function that replies with a default "OK" response
+     * if the caller asks for one (jsonrpc request id).
+     *
+     * @param method to register.
+     * @param action to perform.
+     * @throw std::invalid_argument if the method name starts with "rpc."
+     */
+    void connect(const std::string& method, VoidCallback action);
+
+    /**
+     * Connect a method to a callback with no response.
+     *
+     * This is a convienience function that replies with a default "OK" response
+     * if the caller asks for one (jsonrpc request id).
+     *
+     * @param method to register.
+     * @param action to perform.
+     * @throw std::invalid_argument if the method name starts with "rpc."
+     */
+    void connect(const std::string& method, NotifyCallback action);
+
+    /**
+     * Connect a method to a callback with request parameters but no response.
+     *
+     * The templated Params object must be deserializable by a free function:
+     * from_json(Params& object, const std::string& json).
+     *
+     * @param method to register.
+     * @param action to perform.
+     * @throw std::invalid_argument if the method name starts with "rpc."
+     */
+    template <typename Params>
+    void connect(const std::string& method, std::function<void(Params)> action)
+    {
+        bind(method, [action](const std::string& request) {
+            Params params;
+            if (!from_json(params, request))
+                return JsonRpc::Response::invalidParams();
+            action(std::move(params));
+            return JsonRpc::Response{"OK"};
+        });
+    }
 
     /**
      * Bind a method to a response callback.
@@ -115,7 +161,7 @@ public:
      * @param action to perform that will notify the caller upon completion.
      * @throw std::invalid_argument if the method name starts with "rpc."
      */
-    void bindAsync(const std::string& method, ResponseCallbackAsync action);
+    void bindAsync(const std::string& method, DelayedResponseCallback action);
 
     /**
      * Bind a method to an async response callback with templated parameters.
@@ -142,52 +188,6 @@ public:
     }
 
     /**
-     * Bind a method to a callback with request parameters but no response.
-     *
-     * The templated Params object must be deserializable by a free function:
-     * from_json(Params& object, const std::string& json).
-     *
-     * @param method to register.
-     * @param action to perform.
-     * @throw std::invalid_argument if the method name starts with "rpc."
-     */
-    template <typename Params>
-    void notify(const std::string& method, std::function<void(Params)> action)
-    {
-        bind(method, [action](const std::string& request) {
-            Params params;
-            if (!from_json(params, request))
-                return JsonRpc::Response::invalidParams();
-            action(std::move(params));
-            return JsonRpc::Response{"OK"};
-        });
-    }
-
-    /**
-     * Bind a method to a callback with no response.
-     *
-     * This is a convienience function that replies with a default "OK" response
-     * if the caller asks for one (jsonrpc request id).
-     *
-     * @param method to register.
-     * @param action to perform.
-     * @throw std::invalid_argument if the method name starts with "rpc."
-     */
-    void notify(const std::string& method, NotifyCallback action);
-
-    /**
-     * Bind a method to a callback with no response and no payload.
-     *
-     * This is a convienience function that replies with a default "OK" response
-     * if the caller asks for one (jsonrpc request id).
-     *
-     * @param method to register.
-     * @param action to perform.
-     * @throw std::invalid_argument if the method name starts with "rpc."
-     */
-    void notify(const std::string& method, VoidCallback action);
-
-    /**
      * Process a JSON-RPC request and block for the result.
      *
      * @param request string in JSON-RPC 2.0 format.
@@ -210,7 +210,7 @@ public:
      * @param callback that return a json response string in JSON-RPC 2.0
      *        format upon request completion.
      */
-    void process(const std::string& request, ProcessAsyncCallback callback);
+    void process(const std::string& request, AsyncStringResponse callback);
 
 private:
     class Impl;

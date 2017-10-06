@@ -36,6 +36,7 @@ set(ROCKETS_PUBLIC_HEADERS
 )
 set(ROCKETS_HEADERS
   clientContext.h
+  json.hpp
   pollDescriptors.h
   proxyConnectionError.h
   serverContext.h
@@ -48,9 +49,6 @@ set(ROCKETS_HEADERS
   http/registry.h
   http/requestHandler.h
   http/utils.h
-  jsoncpp/json/json.h
-  jsoncpp/json/json-forwards.h
-  jsoncpp/json11.hpp
   ws/channel.h
   ws/connection.h
   ws/messageHandler.h
@@ -71,8 +69,6 @@ set(ROCKETS_SOURCES
   http/registry.cpp
   http/requestHandler.cpp
   http/utils.cpp
-  jsoncpp/jsoncpp.cpp
-  jsoncpp/json11.cpp
   ws/channel.cpp
   ws/connection.cpp
   ws/client.cpp
@@ -82,12 +78,5 @@ set(ROCKETS_SOURCES
 # std::system_error what():  Unknown error -1
 # https://stackoverflow.com/questions/43928715
 set(ROCKETS_LINK_LIBRARIES PUBLIC Threads::Threads PRIVATE websockets)
-
-if(MSVC)
-  list(APPEND ROCKETS_LINK_LIBRARIES Ws2_32)
-else()
-  set_source_files_properties(jsoncpp/jsoncpp.cpp PROPERTIES COMPILE_FLAGS
-    "-Wno-shadow -Wno-deprecated-declarations")
-endif()
 
 common_library(Rockets)
