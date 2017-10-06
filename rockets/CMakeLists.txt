@@ -18,6 +18,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 set(ROCKETS_PUBLIC_HEADERS
+  jsonRpc.h
   server.h
   socketBasedInterface.h
   socketListener.h
@@ -49,11 +50,13 @@ set(ROCKETS_HEADERS
   http/utils.h
   jsoncpp/json/json.h
   jsoncpp/json/json-forwards.h
+  jsoncpp/json11.hpp
   ws/channel.h
   ws/connection.h
   ws/messageHandler.h
 )
 set(ROCKETS_SOURCES
+  jsonRpc.cpp
   log.cpp
   clientContext.cpp
   pollDescriptors.cpp
@@ -69,6 +72,7 @@ set(ROCKETS_SOURCES
   http/requestHandler.cpp
   http/utils.cpp
   jsoncpp/jsoncpp.cpp
+  jsoncpp/json11.cpp
   ws/channel.cpp
   ws/connection.cpp
   ws/client.cpp
@@ -83,7 +87,7 @@ if(MSVC)
   list(APPEND ROCKETS_LINK_LIBRARIES Ws2_32)
 else()
   set_source_files_properties(jsoncpp/jsoncpp.cpp PROPERTIES COMPILE_FLAGS
-    -Wno-shadow)
+    "-Wno-shadow -Wno-deprecated-declarations")
 endif()
 
 common_library(Rockets)
