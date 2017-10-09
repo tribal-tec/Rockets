@@ -22,9 +22,6 @@
 
 #include <rockets/jsonrpc/emitter.h>
 #include <rockets/jsonrpc/receiver.h>
-#include <rockets/server.h>
-
-#include <memory>
 
 namespace rockets
 {
@@ -33,15 +30,26 @@ namespace jsonrpc
 /**
  * JSON-RPC server.
  */
+template <typename ServerT>
 class Server : public Emitter, public Receiver
 {
 public:
-    Server(rockets::Server& server);
+    Server(ServerT& server)
+        : communicator{server}
+    {
+        communicator.handleText([this](std::string message) {
+            process(std::move(message), [this](std::string response) {
+                communicator.sendText(std::move(response));
+            });
+        });
+    }
 
 private:
-    void _emit(std::string json) final;
-
-    rockets::Server& communicator;
+    void _emit(std::string json) final
+    {
+        communicator.broadcastText(std::move(json));
+    }
+    ServerT communicator;
 };
 }
 }

@@ -72,11 +72,9 @@ set(ROCKETS_SOURCES
   http/registry.cpp
   http/requestHandler.cpp
   http/utils.cpp
-  jsonrpc/client.cpp
   jsonrpc/emitter.cpp
   jsonrpc/receiver.cpp
   jsonrpc/requester.cpp
-  jsonrpc/server.cpp
   ws/channel.cpp
   ws/connection.cpp
   ws/client.cpp
