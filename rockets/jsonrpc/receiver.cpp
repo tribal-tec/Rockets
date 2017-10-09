@@ -17,15 +17,17 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "jsonRpc.h"
+#include "receiver.h"
 
-#include "json.hpp"
+#include "../json.hpp"
 
 #include <map>
 
 using namespace nlohmann;
 
 namespace rockets
+{
+namespace jsonrpc
 {
 namespace
 {
@@ -51,12 +53,7 @@ json makeErrorResponse(const json& error, const json& id = json())
 json makeErrorResponse(const int code, const std::string& message,
                         const json& id = json())
 {
-    return json{{"jsonrpc", "2.0"},
-                {"error",
-                 {
-                     {"code", code}, {"message", message},
-                 }},
-                {"id", id}};
+    return makeErrorResponse(json{{"code", code}, {"message", message}}, id);
 }
 
 bool _isValidJsonRpcRequest(const json& object)
@@ -80,7 +77,7 @@ inline bool begins_with(const std::string& string, const std::string& other)
 }
 } // anonymous namespace
 
-class JsonRpc::Impl
+class Receiver::Impl
 {
 public:
     std::string processBatchBlocking(const json& array)
@@ -140,7 +137,7 @@ public:
         }
 
         const auto& func = method->second;
-        func(params, [callback, id](const JsonRpc::Response rep) {
+        func(params, [callback, id](const Response rep) {
             // No reply for valid "notifications" (requests without an "id")
             if (id.is_null())
             {
@@ -154,35 +151,35 @@ public:
                 callback(makeResponse(rep.result, id));
         });
     }
-    std::map<std::string, JsonRpc::DelayedResponseCallback> methods;
+    std::map<std::string, Receiver::DelayedResponseCallback> methods;
 };
 
-JsonRpc::JsonRpc()
+Receiver::Receiver()
     : _impl{new Impl}
 {
 }
 
-JsonRpc::~JsonRpc()
+Receiver::~Receiver()
 {
 }
 
-void JsonRpc::connect(const std::string& method, VoidCallback action)
+void Receiver::connect(const std::string& method, VoidCallback action)
 {
     bind(method, [action](const std::string&) {
         action();
-        return JsonRpc::Response{"OK"};
+        return Response{"OK"};
     });
 }
 
-void JsonRpc::connect(const std::string& method, NotifyCallback action)
+void Receiver::connect(const std::string& method, NotifyCallback action)
 {
     bind(method, [action](const std::string& request) {
         action(request);
-        return JsonRpc::Response{"OK"};
+        return Response{"OK"};
     });
 }
 
-void JsonRpc::bind(const std::string& method, ResponseCallback action)
+void Receiver::bind(const std::string& method, ResponseCallback action)
 {
     bindAsync(method,
               [this, action](const std::string& req, AsyncResponse callback) {
@@ -190,7 +187,7 @@ void JsonRpc::bind(const std::string& method, ResponseCallback action)
               });
 }
 
-void JsonRpc::bindAsync(const std::string& method,
+void Receiver::bindAsync(const std::string& method,
                         DelayedResponseCallback action)
 {
     if (begins_with(method, reservedMethodPrefix))
@@ -199,12 +196,12 @@ void JsonRpc::bindAsync(const std::string& method,
     _impl->methods[method] = action;
 }
 
-std::string JsonRpc::process(const std::string& request)
+std::string Receiver::process(const std::string& request)
 {
     return processAsync(request).get();
 }
 
-std::future<std::string> JsonRpc::processAsync(const std::string& request)
+std::future<std::string> Receiver::processAsync(const std::string& request)
 {
     auto promise = std::make_shared<std::promise<std::string>>();
     auto future = promise->get_future();
@@ -215,7 +212,7 @@ std::future<std::string> JsonRpc::processAsync(const std::string& request)
     return future;
 }
 
-void JsonRpc::process(const std::string& request, AsyncStringResponse callback)
+void Receiver::process(const std::string& request, AsyncStringResponse callback)
 {
     const auto document = json::parse(request, nullptr, false);
     if (document.is_object())
@@ -229,5 +226,6 @@ void JsonRpc::process(const std::string& request, AsyncStringResponse callback)
         callback(_impl->processBatchBlocking(document));
     else
         callback(dump(makeErrorResponse(parseError)));
+}
 }
 }

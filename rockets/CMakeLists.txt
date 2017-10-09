@@ -1,6 +1,5 @@
 # Copyright (c) 2017, EPFL/Blue Brain Project
 #                     Raphael.Dumusc@epfl.ch
-#                     Daniel.Nachbaur@epfl.ch
 #
 # This file is part of Rockets <https://github.com/BlueBrain/Rockets>
 #
@@ -18,7 +17,6 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
 set(ROCKETS_PUBLIC_HEADERS
-  jsonRpc.h
   server.h
   socketBasedInterface.h
   socketListener.h
@@ -29,6 +27,12 @@ set(ROCKETS_PUBLIC_HEADERS
   http/request.h
   http/response.h
   http/types.h
+  jsonrpc/client.h
+  jsonrpc/emitter.h
+  jsonrpc/receiver.h
+  jsonrpc/requester.h
+  jsonrpc/server.h
+  jsonrpc/types.h
   qt/readWriteSocketNotifier.h
   qt/socketProcessor.h
   ws/client.h
@@ -54,7 +58,6 @@ set(ROCKETS_HEADERS
   ws/messageHandler.h
 )
 set(ROCKETS_SOURCES
-  jsonRpc.cpp
   log.cpp
   clientContext.cpp
   pollDescriptors.cpp
@@ -69,6 +72,11 @@ set(ROCKETS_SOURCES
   http/registry.cpp
   http/requestHandler.cpp
   http/utils.cpp
+  jsonrpc/client.cpp
+  jsonrpc/emitter.cpp
+  jsonrpc/receiver.cpp
+  jsonrpc/requester.cpp
+  jsonrpc/server.cpp
   ws/channel.cpp
   ws/connection.cpp
   ws/client.cpp

@@ -17,52 +17,26 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef ROCKETS_JSONRPC_H
-#define ROCKETS_JSONRPC_H
+#ifndef ROCKETS_JSONRPC_RECEIVER_H
+#define ROCKETS_JSONRPC_RECEIVER_H
 
-#include <functional>
+#include <rockets/jsonrpc/types.h>
+
 #include <future>
 #include <memory>
-#include <string>
 
 namespace rockets
+{
+namespace jsonrpc
 {
 /**
  * JSON-RPC 2.0 request processor.
  *
  * See specification: http://www.jsonrpc.org/specification
  */
-class JsonRpc
+class Receiver
 {
 public:
-    /**
-     * Response to a well-formed RPC request.
-     */
-    struct Response
-    {
-        std::string result;
-        int error = 0;
-
-        Response() = default;
-        Response(std::string&& res)
-            : result(res)
-        {
-        }
-        Response(std::string&& res, const int err)
-            : result(res)
-            , error{err}
-        {
-        }
-
-        static Response invalidParams() { return {"Invalid params", -32602}; }
-    };
-
-    /** @name Asynchronous response to a request. */
-    //@{
-    using AsyncResponse = std::function<void(Response)>;
-    using AsyncStringResponse = std::function<void(std::string)>;
-    //@}
-
     /** @name Callbacks that can be registered. */
     //@{
     using VoidCallback = std::function<void()>;
@@ -73,10 +47,10 @@ public:
     //@}
 
     /** Constructor. */
-    JsonRpc();
+    Receiver();
 
     /** Destructor. */
-    ~JsonRpc();
+    virtual ~Receiver();
 
     /**
      * Connect a method to a callback with no response and no payload.
@@ -118,9 +92,9 @@ public:
         bind(method, [action](const std::string& request) {
             Params params;
             if (!from_json(params, request))
-                return JsonRpc::Response::invalidParams();
+                return Response::invalidParams();
             action(std::move(params));
-            return JsonRpc::Response{"OK"};
+            return Response{"OK"};
         });
     }
 
@@ -149,7 +123,7 @@ public:
         bind(method, [action](const std::string& request) {
             Params params;
             if (!from_json(params, request))
-                return JsonRpc::Response::invalidParams();
+                return Response::invalidParams();
             return action(std::move(params));
         });
     }
@@ -183,7 +157,7 @@ public:
                       if (from_json(params, request))
                           action(std::move(params), callback);
                       else
-                          callback(JsonRpc::Response::invalidParams());
+                          callback(Response::invalidParams());
                   });
     }
 
@@ -216,6 +190,7 @@ private:
     class Impl;
     std::unique_ptr<Impl> _impl;
 };
+}
 }
 
 #endif
