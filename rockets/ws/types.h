@@ -81,6 +81,12 @@ using MessageCallback = std::function<Response(std::string)>;
 
 /** Websocket callback for handling connection (open/close) messages. */
 using ConnectionCallback = std::function<std::vector<Response>()>;
+
+/** Callback for asynchronously responding to a message. */
+using ResponseCallback = std::function<void(std::string)>;
+
+/** Callback for handling messge with asynchronous response. */
+using MessageCallbackAsync = std::function<void(std::string, ResponseCallback)>;
 }
 }
 

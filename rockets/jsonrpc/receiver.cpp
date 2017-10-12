@@ -188,7 +188,7 @@ void Receiver::bind(const std::string& method, ResponseCallback action)
 }
 
 void Receiver::bindAsync(const std::string& method,
-                        DelayedResponseCallback action)
+                         DelayedResponseCallback action)
 {
     if (begins_with(method, reservedMethodPrefix))
         throw std::invalid_argument(reservedMethodError);

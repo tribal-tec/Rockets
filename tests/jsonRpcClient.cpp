@@ -37,34 +37,127 @@
 /* or implied, of Ecole polytechnique federale de Lausanne.          */
 /*********************************************************************/
 
-#define BOOST_TEST_MODULE rockets_jsonrpc_client
+#define BOOST_TEST_MODULE rockets_jsonrpc_client_server
 
 #include <boost/test/unit_test.hpp>
 
 #include "rockets/jsonrpc/client.h"
 #include "rockets/jsonrpc/server.h"
-#include "rockets/ws/types.h"
-
-namespace
-{
-}
+#include "rockets/ws/client.h"
+#include "rockets/server.h"
+#include "rockets/json.hpp"
 
 using namespace rockets;
 
+namespace
+{
+const std::string simpleMessage(R"({
+    "value": true
+})");
+}
+
 struct MockNetworkCommunicator
 {
-    void handleText(ws::MessageCallback callback);
-    void sendText(std::string message);
+    void handleText(ws::MessageCallback callback)
+    {
+        handleMessage = callback;
+    }
+
+    void handleText(ws::MessageCallbackAsync callback)
+    {
+        handleMessageAsync = callback;
+    }
+
+    void sendText(std::string message)
+    {
+        if (blockRecursion)
+            return;
+        blockRecursion = true;
+
+        // Handle return message from Receiver without infinite loop.
+        // The ws::MessageHandler normally does this in the rockets::Server.
+        auto ret = sendToRemoteEndpoint(message);
+        if (!ret.empty())
+            handleMessage(std::move(ret));
+
+        blockRecursion = false;
+    }
+
+    void broadcastText(const std::string& message)
+    {
+        sendToRemoteEndpoint(message);
+    }
+
+    void connectWith(MockNetworkCommunicator& other)
+    {
+        sendToRemoteEndpoint = other.handleMessage;
+        other.sendToRemoteEndpoint = handleMessage;
+    }
+
+    ws::MessageCallback handleMessage;
+    ws::MessageCallbackAsync handleMessageAsync;
+    ws::MessageCallback sendToRemoteEndpoint;
+    bool blockRecursion = false;
 };
+
+BOOST_AUTO_TEST_CASE(client_constructor)
+{
+    ws::Client wsClient;
+    jsonrpc::Client<ws::Client> client{wsClient};
+}
+
+BOOST_AUTO_TEST_CASE(server_constructor)
+{
+    Server wsServer;
+    jsonrpc::Server<Server> server{wsServer};
+}
 
 struct Fixture
 {
-    jsonrpc::Receiver jsonRpc;
+    MockNetworkCommunicator serverCommunicator;
+    MockNetworkCommunicator clientCommunicator;
+    jsonrpc::Server<MockNetworkCommunicator> server{serverCommunicator};
+    jsonrpc::Client<MockNetworkCommunicator> client{clientCommunicator};
+    Fixture()
+    {
+        serverCommunicator.connectWith(clientCommunicator);
+    }
 };
 
-BOOST_FIXTURE_TEST_CASE(process_obj, Fixture)
+BOOST_FIXTURE_TEST_CASE(client_notification_received_by_server, Fixture)
 {
-    jsonRpc.bind("subtract", std::bind(&substractObj, std::placeholders::_1));
-    BOOST_CHECK_EQUAL(jsonRpc.process(substractObject), substractResult);
+    bool received = false;
+    server.connect("test", [&](const std::string& request) {
+        received = (request == simpleMessage);
+    });
+    client.emit("test", simpleMessage);
+    BOOST_CHECK(received);
 }
 
+BOOST_FIXTURE_TEST_CASE(client_request_answered_by_server, Fixture)
+{
+    bool receivedRequest = false;
+    bool receivedReply = false;
+    std::string receivedValue;
+    server.bind("test", [&](const std::string& request) {
+        receivedRequest = (request == simpleMessage);
+        return jsonrpc::Response{"42"};
+    });
+    client.request("test", simpleMessage, [&](jsonrpc::Response response) {
+        receivedReply = !response.error;
+        receivedValue = response.result;
+    });
+    BOOST_CHECK(receivedRequest);
+    BOOST_CHECK(receivedReply);
+    BOOST_CHECK_EQUAL(receivedValue, "\"42\"");
+}
+
+BOOST_FIXTURE_TEST_CASE(server_notification_received_by_client, Fixture)
+{
+    bool received = false;
+    client.connect("test", [&](const std::string& request) {
+        received = (request == simpleMessage);
+    });
+    server.emit("test", simpleMessage);
+    BOOST_CHECK(received);
+}

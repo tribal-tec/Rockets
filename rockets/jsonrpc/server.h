@@ -22,6 +22,9 @@
 
 #include <rockets/jsonrpc/emitter.h>
 #include <rockets/jsonrpc/receiver.h>
+#include <rockets/ws/types.h>
+
+#include <iostream>
 
 namespace rockets
 {
@@ -37,10 +40,10 @@ public:
     Server(ServerT& server)
         : communicator{server}
     {
-        communicator.handleText([this](std::string message) {
-            process(std::move(message), [this](std::string response) {
-                communicator.sendText(std::move(response));
-            });
+        communicator.handleText([this](std::string message,
+                                ws::MessageCallbackAsync callback) {
+            process(std::move(message), callback);
+//            return process(std::move(message));
         });
     }
 
@@ -49,7 +52,7 @@ private:
     {
         communicator.broadcastText(std::move(json));
     }
-    ServerT communicator;
+    ServerT& communicator;
 };
 }
 }
