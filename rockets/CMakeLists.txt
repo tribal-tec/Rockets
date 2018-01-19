@@ -1,5 +1,5 @@
-# Copyright (c) 2017, EPFL/Blue Brain Project
-#                     Raphael.Dumusc@epfl.ch
+# Copyright (c) 2017-2018, EPFL/Blue Brain Project
+#                          Raphael.Dumusc@epfl.ch
 #
 # This file is part of Rockets <https://github.com/BlueBrain/Rockets>
 #
@@ -15,6 +15,14 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this library; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+list(APPEND CPPCHECK_EXTRA_ARGS
+  --suppress=*:${CMAKE_CURRENT_SOURCE_DIR}/json.hpp)
+
+# bug while checking json.hpp, --suppress does not remove the error exit code
+if(CPPCHECK_VERSION VERSION_LESS 1.78)
+  list(APPEND CPPCHECK_EXTRA_ARGS --error-exitcode=0)
+endif()
 
 set(ROCKETS_PUBLIC_HEADERS
   server.h
