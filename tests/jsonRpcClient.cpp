@@ -41,11 +41,11 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include "rockets/json.hpp"
 #include "rockets/jsonrpc/client.h"
 #include "rockets/jsonrpc/server.h"
-#include "rockets/ws/client.h"
 #include "rockets/server.h"
-#include "rockets/json.hpp"
+#include "rockets/ws/client.h"
 
 using namespace rockets;
 
@@ -58,11 +58,7 @@ const std::string simpleMessage(R"({
 
 struct MockNetworkCommunicator
 {
-    void handleText(ws::MessageCallback callback)
-    {
-        handleMessage = callback;
-    }
-
+    void handleText(ws::MessageCallback callback) { handleMessage = callback; }
     void handleText(ws::MessageCallbackAsync callback)
     {
         handleMessageAsync = callback;
@@ -77,8 +73,8 @@ struct MockNetworkCommunicator
         // Handle return message from Receiver without infinite loop.
         // The ws::MessageHandler normally does this in the rockets::Server.
         auto ret = sendToRemoteEndpoint(message);
-        if (!ret.empty())
-            handleMessage(std::move(ret));
+        if (!ret.message.empty())
+            handleMessage(std::move(ret.message));
 
         blockRecursion = false;
     }
@@ -118,10 +114,7 @@ struct Fixture
     MockNetworkCommunicator clientCommunicator;
     jsonrpc::Server<MockNetworkCommunicator> server{serverCommunicator};
     jsonrpc::Client<MockNetworkCommunicator> client{clientCommunicator};
-    Fixture()
-    {
-        serverCommunicator.connectWith(clientCommunicator);
-    }
+    Fixture() { serverCommunicator.connectWith(clientCommunicator); }
 };
 
 BOOST_FIXTURE_TEST_CASE(client_notification_received_by_server, Fixture)

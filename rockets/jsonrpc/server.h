@@ -40,11 +40,10 @@ public:
     Server(ServerT& server)
         : communicator{server}
     {
-        communicator.handleText([this](std::string message,
-                                ws::MessageCallbackAsync callback) {
-            process(std::move(message), callback);
-//            return process(std::move(message));
-        });
+        communicator.handleText(
+            [this](std::string message, ws::ResponseCallback callback) {
+                process(std::move(message), callback);
+            });
     }
 
 private:
