@@ -36,16 +36,18 @@ json makeNotification(const std::string& method)
 
 json makeNotification(const std::string& method, json&& params)
 {
-    return json{{"jsonrpc", "2.0"}, {"method", method},
+    return json{{"jsonrpc", "2.0"},
+                {"method", method},
                 {"params", std::move(params)}};
 }
 }
 
 void Emitter::emit(const std::string& method, const std::string& params)
 {
-    auto notification = params.empty() ? makeNotification(method) :
-                        makeNotification(method, json::parse(params));
-    _emit(notification.dump(4));
+    const auto notification =
+        params.empty() ? makeNotification(method)
+                       : makeNotification(method, json::parse(params));
+    _sendNotification(notification.dump(4));
 }
 }
 }

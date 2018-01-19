@@ -36,7 +36,9 @@ json makeRequest(const std::string& method, const size_t id)
 
 json makeRequest(const std::string& method, const size_t id, json&& params)
 {
-    return json{{"jsonrpc", "2.0"}, {"method", method}, {"id", id},
+    return json{{"jsonrpc", "2.0"},
+                {"method", method},
+                {"id", id},
                 {"params", std::move(params)}};
 }
 
@@ -55,11 +57,11 @@ bool isValidId(const json& id)
 bool isValidJsonRpcResponse(const json& object)
 {
     return object.count("jsonrpc") &&
-            object["jsonrpc"].get<std::string>() == "2.0" &&
-            ((object.count("result") && !object.count("error")) ||
-             (object.count("error") && !object.count("result") &&
+           object["jsonrpc"].get<std::string>() == "2.0" &&
+           ((object.count("result") && !object.count("error")) ||
+            (object.count("error") && !object.count("result") &&
              isValidError(object["error"]))) &&
-            object.count("id") && isValidId(object["id"]);
+           object.count("id") && isValidId(object["id"]);
 }
 
 Response makeResponse(const json& object)
@@ -74,13 +76,25 @@ Response makeResponse(const json& object)
 }
 }
 
+std::future<Response> Requester::request(const std::string& method,
+                                         const std::string& params)
+{
+    auto promise = std::make_shared<std::promise<Response>>();
+    auto callback = [promise](Response response) {
+        promise->set_value(std::move(response));
+    };
+    request(method, params, callback);
+    return promise->get_future();
+}
+
 void Requester::request(const std::string& method, const std::string& params,
                         AsyncResponse callback)
 {
-    auto request = params.empty() ? makeRequest(method, lastId) :
-                        makeRequest(method, lastId, json::parse(params));
+    auto request = params.empty()
+                       ? makeRequest(method, lastId)
+                       : makeRequest(method, lastId, json::parse(params));
     pendingRequests.emplace(lastId++, callback);
-    _request(request.dump(4));
+    _sendRequest(request.dump(4));
 }
 
 bool Requester::processResponse(const std::string& json)

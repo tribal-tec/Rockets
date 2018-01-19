@@ -30,6 +30,17 @@ namespace jsonrpc
 {
 /**
  * JSON-RPC client.
+ *
+ * The client can be used over any communication channel that provides the
+ * following methods:
+ *
+ * - void sendText(std::string message);
+ *   Used to send notifications and requests to the server.
+ *
+ * - void handleText(ws::MessageCallback callback);
+ *   Used to register a callback for processing the responses from the server
+ *   when they arrive (non-blocking requests) as well as receiving
+ *   notifications.
  */
 template <typename Communicator>
 class Client : public Emitter, public Receiver, public Requester
@@ -42,7 +53,8 @@ public:
             if (!processResponse(message))
             {
                 process(std::move(message), [this](std::string response) {
-                    communicator.sendText(std::move(response));
+                    if (!response.empty())
+                        communicator.sendText(std::move(response));
                 });
             }
             return std::string();
@@ -50,11 +62,11 @@ public:
     }
 
 private:
-    void _emit(std::string json) final
+    void _sendNotification(std::string json) final
     {
         communicator.sendText(std::move(json));
     }
-    void _request(std::string json) final
+    void _sendRequest(std::string json) final
     {
         communicator.sendText(std::move(json));
     }

@@ -22,11 +22,12 @@
 
 #define BOOST_TEST_MODULE rockets_http
 
+#include "json_utils.h"
+
 #include <rockets/http/client.h>
 #include <rockets/http/helpers.h>
 #include <rockets/http/request.h>
 #include <rockets/http/response.h>
-#include <rockets/json.hpp>
 #include <rockets/server.h>
 
 #include <libwebsockets.h>
@@ -45,12 +46,6 @@ using namespace rockets;
 
 namespace
 {
-template <typename T>
-std::string json_reformat(T&& json)
-{
-    return nlohmann::json::parse(std::forward<T>(json)).dump(4);
-}
-
 const auto echoFunc = [](const http::Request& request) {
     auto body = request.path;
 

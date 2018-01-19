@@ -32,6 +32,16 @@ namespace jsonrpc
 {
 /**
  * JSON-RPC server.
+ *
+ * The server can be used over any communication channel that provides the
+ * following methods:
+ *
+ * - void broadcastText(std::string message);
+ *   Used for sending notifications to connected clients.
+ *
+ * - void handleText(ws::MessageCallback callback);
+ *   Used to register a callback for processing the requests and notifications
+ *   coming from the client(s).
  */
 template <typename ServerT>
 class Server : public Emitter, public Receiver
@@ -47,7 +57,7 @@ public:
     }
 
 private:
-    void _emit(std::string json) final
+    void _sendNotification(std::string json) final
     {
         communicator.broadcastText(std::move(json));
     }

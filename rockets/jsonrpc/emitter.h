@@ -27,15 +27,27 @@ namespace rockets
 namespace jsonrpc
 {
 /**
- * Emitter of JSON-RPC notifications.
+ * Emitter of JSON-RPC notifications (request without an id and no response).
  */
 class Emitter
 {
 public:
     virtual ~Emitter() = default;
 
+    /**
+     * Emit a notification.
+     *
+     * @param method to call.
+     * @param params for the notification.
+     */
     void emit(const std::string& method, const std::string& params);
 
+    /**
+     * Emit a notification using a JSON-serializable object.
+     *
+     * @param method to call.
+     * @param params object to send.
+     */
     template <typename Params>
     void emit(const std::string& method, const Params& params)
     {
@@ -43,7 +55,7 @@ public:
     }
 
 private:
-    virtual void _emit(std::string json) = 0;
+    virtual void _sendNotification(std::string json) = 0;
 };
 }
 }

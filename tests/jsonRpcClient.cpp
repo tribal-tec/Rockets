@@ -41,24 +41,23 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include "rockets/json.hpp"
-#include "rockets/jsonrpc/client.h"
-#include "rockets/jsonrpc/server.h"
-#include "rockets/server.h"
-#include "rockets/ws/client.h"
+#include "json_utils.h"
+#include "rockets/http/utils.h"
+
+#include <rockets/jsonrpc/client.h>
+#include <rockets/jsonrpc/server.h>
+#include <rockets/server.h>
+#include <rockets/ws/client.h>
 
 using namespace rockets;
 
 namespace
 {
-const std::string simpleMessage(R"({
-    "value": true
-})");
+const std::string simpleMessage = json_reformat(R"({ "value": true })");
 }
 
-struct MockNetworkCommunicator
+struct MockServerCommunicator
 {
-    void handleText(ws::MessageCallback callback) { handleMessage = callback; }
     void handleText(ws::MessageCallbackAsync callback)
     {
         handleMessageAsync = callback;
@@ -66,17 +65,9 @@ struct MockNetworkCommunicator
 
     void sendText(std::string message)
     {
-        if (blockRecursion)
-            return;
-        blockRecursion = true;
-
-        // Handle return message from Receiver without infinite loop.
-        // The ws::MessageHandler normally does this in the rockets::Server.
         auto ret = sendToRemoteEndpoint(message);
         if (!ret.message.empty())
-            handleMessage(std::move(ret.message));
-
-        blockRecursion = false;
+            handleMessageAsync(std::move(ret.message), [](std::string) {});
     }
 
     void broadcastText(const std::string& message)
@@ -84,16 +75,38 @@ struct MockNetworkCommunicator
         sendToRemoteEndpoint(message);
     }
 
-    void connectWith(MockNetworkCommunicator& other)
+    ws::MessageCallbackAsync handleMessageAsync;
+    ws::MessageCallback sendToRemoteEndpoint;
+};
+
+struct MockClientCommunicator
+{
+    void handleText(ws::MessageCallback callback)
     {
-        sendToRemoteEndpoint = other.handleMessage;
+        handleMessage = std::move(callback);
+    }
+
+    void sendText(std::string message)
+    {
+        auto handleResponse = [this](std::string ret) {
+            if (!ret.empty())
+            {
+                handleMessage(std::move(ret));
+                receivedMessage = true;
+            }
+        };
+        sendToRemoteEndpoint(message, handleResponse);
+    }
+
+    void connectWith(MockServerCommunicator& other)
+    {
+        sendToRemoteEndpoint = other.handleMessageAsync;
         other.sendToRemoteEndpoint = handleMessage;
     }
 
     ws::MessageCallback handleMessage;
-    ws::MessageCallbackAsync handleMessageAsync;
-    ws::MessageCallback sendToRemoteEndpoint;
-    bool blockRecursion = false;
+    ws::MessageCallbackAsync sendToRemoteEndpoint;
+    bool receivedMessage = false;
 };
 
 BOOST_AUTO_TEST_CASE(client_constructor)
@@ -110,11 +123,11 @@ BOOST_AUTO_TEST_CASE(server_constructor)
 
 struct Fixture
 {
-    MockNetworkCommunicator serverCommunicator;
-    MockNetworkCommunicator clientCommunicator;
-    jsonrpc::Server<MockNetworkCommunicator> server{serverCommunicator};
-    jsonrpc::Client<MockNetworkCommunicator> client{clientCommunicator};
-    Fixture() { serverCommunicator.connectWith(clientCommunicator); }
+    MockServerCommunicator serverCommunicator;
+    MockClientCommunicator clientCommunicator;
+    jsonrpc::Server<MockServerCommunicator> server{serverCommunicator};
+    jsonrpc::Client<MockClientCommunicator> client{clientCommunicator};
+    Fixture() { clientCommunicator.connectWith(serverCommunicator); }
 };
 
 BOOST_FIXTURE_TEST_CASE(client_notification_received_by_server, Fixture)
@@ -129,20 +142,49 @@ BOOST_FIXTURE_TEST_CASE(client_notification_received_by_server, Fixture)
 
 BOOST_FIXTURE_TEST_CASE(client_request_answered_by_server, Fixture)
 {
-    bool receivedRequest = false;
-    bool receivedReply = false;
+    bool serverReceivedRequest = false;
+    bool clientReceivedReply = false;
     std::string receivedValue;
     server.bind("test", [&](const std::string& request) {
-        receivedRequest = (request == simpleMessage);
+        serverReceivedRequest = (request == simpleMessage);
         return jsonrpc::Response{"42"};
     });
     client.request("test", simpleMessage, [&](jsonrpc::Response response) {
-        receivedReply = !response.error;
+        clientReceivedReply = !response.error;
         receivedValue = response.result;
     });
-    BOOST_CHECK(receivedRequest);
-    BOOST_CHECK(receivedReply);
+    BOOST_CHECK(serverReceivedRequest);
+    BOOST_CHECK(clientReceivedReply);
     BOOST_CHECK_EQUAL(receivedValue, "\"42\"");
+}
+
+BOOST_FIXTURE_TEST_CASE(client_request_answered_by_server_using_future, Fixture)
+{
+    bool serverReceivedRequest = false;
+    std::string receivedValue;
+    server.bind("test", [&](const std::string& request) {
+        serverReceivedRequest = (request == simpleMessage);
+        return jsonrpc::Response{"42"};
+    });
+    auto future = client.request("test", simpleMessage);
+    BOOST_CHECK(serverReceivedRequest);
+    BOOST_REQUIRE(http::is_ready(future));
+
+    const jsonrpc::Response response = future.get();
+    BOOST_CHECK(!response.error);
+    BOOST_CHECK_EQUAL(response.result, "\"42\"");
+}
+
+BOOST_FIXTURE_TEST_CASE(client_notification_generates_no_response, Fixture)
+{
+    bool serverReceivedRequest = false;
+    server.bind("test", [&](const std::string& request) {
+        serverReceivedRequest = (request == simpleMessage);
+        return jsonrpc::Response{"42"};
+    });
+    client.emit("test", simpleMessage);
+    BOOST_CHECK(serverReceivedRequest);
+    BOOST_CHECK(!clientCommunicator.receivedMessage);
 }
 
 BOOST_FIXTURE_TEST_CASE(server_notification_received_by_client, Fixture)

@@ -22,6 +22,7 @@
 
 #include <rockets/jsonrpc/types.h>
 
+#include <future>
 #include <map>
 
 namespace rockets
@@ -35,6 +36,16 @@ class Requester
 {
 public:
     virtual ~Requester() = default;
+
+    /**
+     * Make a request.
+     *
+     * @param method to call.
+     * @param params for the request in json format (optional).
+     * @return future result, including a possible error code.
+     */
+    std::future<Response> request(const std::string& method,
+                                  const std::string& params);
 
     /**
      * Make a request.
@@ -57,7 +68,7 @@ protected:
     bool processResponse(const std::string& json);
 
 private:
-    virtual void _request(std::string json) = 0;
+    virtual void _sendRequest(std::string json) = 0;
 
     std::map<size_t, AsyncResponse> pendingRequests;
     size_t lastId = 0u;

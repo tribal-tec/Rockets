@@ -76,17 +76,17 @@ struct Response
     Format format = Format::unspecified; // derive from request format
 };
 
-/** WebSocket callback for handling text / binary messages. */
-using MessageCallback = std::function<Response(std::string)>;
-
-/** Websocket callback for handling connection (open/close) messages. */
-using ConnectionCallback = std::function<std::vector<Response>()>;
-
 /** Callback for asynchronously responding to a message. */
 using ResponseCallback = std::function<void(std::string)>;
 
-/** Callback for handling messge with asynchronous response. */
+/** WebSocket callback for handling text / binary messages. */
+using MessageCallback = std::function<Response(std::string)>;
+
+/** Callback for handling messge with delayed response. */
 using MessageCallbackAsync = std::function<void(std::string, ResponseCallback)>;
+
+/** Websocket callback for handling connection (open/close) messages. */
+using ConnectionCallback = std::function<std::vector<Response>()>;
 }
 }
 
