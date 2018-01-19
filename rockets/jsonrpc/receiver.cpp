@@ -1,5 +1,5 @@
-/* Copyright (c) 2017, EPFL/Blue Brain Project
- *                     Raphael.Dumusc@epfl.ch
+/* Copyright (c) 2017-2018, EPFL/Blue Brain Project
+ *                          Raphael.Dumusc@epfl.ch
  *
  * This file is part of Rockets <https://github.com/BlueBrain/Rockets>
  *
@@ -51,14 +51,15 @@ json makeErrorResponse(const json& error, const json& id = json())
 }
 
 json makeErrorResponse(const int code, const std::string& message,
-                        const json& id = json())
+                       const json& id = json())
 {
     return makeErrorResponse(json{{"code", code}, {"message", message}}, id);
 }
 
 bool _isValidJsonRpcRequest(const json& object)
 {
-    return object.count("jsonrpc") && object["jsonrpc"].get<std::string>() == "2.0" &&
+    return object.count("jsonrpc") &&
+           object["jsonrpc"].get<std::string>() == "2.0" &&
            object.count("method") && object["method"].is_string() &&
            (!object.count("params") || object["params"].is_object() ||
             object["params"].is_array()) &&
@@ -100,8 +101,7 @@ public:
                     responses.push_back(response);
             }
             else
-                responses.push_back(
-                    makeErrorResponse(invalidRequest));
+                responses.push_back(makeErrorResponse(invalidRequest));
         }
         return responses;
     }

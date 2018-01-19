@@ -1,5 +1,5 @@
-/* Copyright (c) 2017, EPFL/Blue Brain Project
- *                     Raphael.Dumusc@epfl.ch
+/* Copyright (c) 2017-2018, EPFL/Blue Brain Project
+ *                          Raphael.Dumusc@epfl.ch
  *
  * This file is part of Rockets <https://github.com/BlueBrain/Rockets>
  *
@@ -51,25 +51,31 @@ public:
     {
         communicator.handleText([this](std::string message) {
             if (!processResponse(message))
-            {
-                process(std::move(message), [this](std::string response) {
-                    if (!response.empty())
-                        communicator.sendText(std::move(response));
-                });
-            }
+                _processNotification(message);
             return std::string();
         });
     }
 
 private:
-    void _sendNotification(std::string json) final
+    /** Emitter::_sendNotification */
+    void _sendNotification(std::string json) final { _send(std::move(json)); }
+    /** Requester::_sendRequest */
+    void _sendRequest(std::string json) final { _send(std::move(json)); }
+    void _processNotification(const std::string& message)
     {
-        communicator.sendText(std::move(json));
+        process(message, [this](std::string response) {
+            // Note: response should normally be empty, as we don't expect to
+            // receive requests from the server (only notifications).
+            if (!response.empty())
+                _send(std::move(response));
+        });
     }
-    void _sendRequest(std::string json) final
+
+    void _send(std::string&& message)
     {
-        communicator.sendText(std::move(json));
+        communicator.sendText(std::move(message));
     }
+
     Communicator& communicator;
 };
 }

@@ -1,6 +1,6 @@
 /*********************************************************************/
-/* Copyright (c) 2017, EPFL/Blue Brain Project                       */
-/*                     Raphael Dumusc <raphael.dumusc@epfl.ch>       */
+/* Copyright (c) 2017-2018, EPFL/Blue Brain Project                  */
+/*                          Raphael Dumusc <raphael.dumusc@epfl.ch>  */
 /* All rights reserved.                                              */
 /*                                                                   */
 /* Redistribution and use in source and binary forms, with or        */
@@ -41,8 +41,8 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include "rockets/jsonrpc/receiver.h"
 #include "rockets/json.hpp"
+#include "rockets/jsonrpc/receiver.h"
 
 #include <thread>
 
@@ -288,12 +288,11 @@ BOOST_FIXTURE_TEST_CASE(process_notification, Fixture)
     bool called = false;
     jsonrpc::Response response;
     jsonrpc::Receiver::ResponseCallback action =
-            [&called, &response](const std::string& params)
-    {
-        called = true;
-        response = substractArr(params);
-        return response;
-    };
+        [&called, &response](const std::string& params) {
+            called = true;
+            response = substractArr(params);
+            return response;
+        };
     jsonRpc.bind("subtract", action);
     BOOST_CHECK(jsonRpc.process(substractNotification).empty());
     BOOST_CHECK(called);
@@ -342,7 +341,8 @@ BOOST_FIXTURE_TEST_CASE(reserved_method_names, Fixture)
                       std::invalid_argument);
     BOOST_CHECK_THROW(jsonRpc.connect("rpc.", [](const std::string&) {}),
                       std::invalid_argument);
-    BOOST_CHECK_THROW(jsonRpc.connect("rpc.void", [] {}), std::invalid_argument);
+    BOOST_CHECK_THROW(jsonRpc.connect("rpc.void", [] {}),
+                      std::invalid_argument);
 
     BOOST_CHECK_NO_THROW(jsonRpc.bind("RPC.xyz", bindFunc));
     BOOST_CHECK_NO_THROW(jsonRpc.bind("rpc", bindFunc));
@@ -396,12 +396,11 @@ BOOST_FIXTURE_TEST_CASE(process_array_notification, Fixture)
     int called = 0;
     jsonrpc::Response response;
     jsonrpc::Receiver::ResponseCallback action =
-            [&called, &response](const std::string& params)
-    {
-        ++called;
-        response = substractArr(params);
-        return response;
-    };
+        [&called, &response](const std::string& params) {
+            ++called;
+            response = substractArr(params);
+            return response;
+        };
     jsonRpc.bind("subtract", action);
     BOOST_CHECK(jsonRpc.process(substractBatchNotification).empty());
     BOOST_CHECK_EQUAL(called, 2);

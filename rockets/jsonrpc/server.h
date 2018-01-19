@@ -1,5 +1,5 @@
-/* Copyright (c) 2017, EPFL/Blue Brain Project
- *                     Raphael.Dumusc@epfl.ch
+/* Copyright (c) 2017-2018, EPFL/Blue Brain Project
+ *                          Raphael.Dumusc@epfl.ch
  *
  * This file is part of Rockets <https://github.com/BlueBrain/Rockets>
  *
@@ -57,10 +57,12 @@ public:
     }
 
 private:
+    /** Emitter::_sendNotification */
     void _sendNotification(std::string json) final
     {
         communicator.broadcastText(std::move(json));
     }
+
     ServerT& communicator;
 };
 }
