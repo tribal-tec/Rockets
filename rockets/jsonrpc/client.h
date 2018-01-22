@@ -49,9 +49,9 @@ public:
     Client(Communicator& comm)
         : communicator{comm}
     {
-        communicator.handleText([this](std::string message) {
-            if (!processResponse(message))
-                _processNotification(message);
+        communicator.handleText([this](const jsonrpc::Request& request) {
+            if (!processResponse(request.message))
+                _processNotification(request.message);
             return std::string();
         });
     }

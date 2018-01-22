@@ -46,10 +46,10 @@ void MessageHandler::handleMessage(Connection& connection, const char* data,
     if (format == Format::text)
     {
         if (callbackText)
-            response = callbackText(std::move(_buffer));
+            response = callbackText({std::move(_buffer), reinterpret_cast<uintptr_t>(&connection) });
         else if (callbackTextAsync)
         {
-            callbackTextAsync(std::move(_buffer),
+            callbackTextAsync({std::move(_buffer), reinterpret_cast<uintptr_t>(&connection) },
                               [&connection](std::string reply)
             {
                 if (!reply.empty())
@@ -59,7 +59,7 @@ void MessageHandler::handleMessage(Connection& connection, const char* data,
         }
     }
     else if (format == Format::binary && callbackBinary)
-        response = callbackBinary(std::move(_buffer));
+        response = callbackBinary({std::move(_buffer), reinterpret_cast<uintptr_t>(&connection)});
 
     if (response.format == Format::unspecified)
         response.format = format;

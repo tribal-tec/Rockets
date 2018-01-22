@@ -23,10 +23,14 @@
 #include <functional>
 #include <string>
 
+#include <rockets/ws/types.h>
+
 namespace rockets
 {
 namespace jsonrpc
 {
+using ws::Request;
+
 /**
  * Response to a well-formed RPC request.
  */
