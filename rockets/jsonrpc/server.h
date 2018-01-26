@@ -52,7 +52,7 @@ public:
     {
         communicator.handleText(
             [this](ws::Request request, ws::ResponseCallback callback) {
-                process({std::move(request.message), request.clientID}, callback);
+                process(std::move(request), callback);
             });
     }
 

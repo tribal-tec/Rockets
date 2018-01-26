@@ -272,6 +272,47 @@ BOOST_FIXTURE_TEST_CASE_TEMPLATE(server_broadcast_text_message, F, Fixtures, F)
     BOOST_CHECK(F::receivedReply2);
 }
 
+BOOST_FIXTURE_TEST_CASE_TEMPLATE(server_broadcast_filtered_text_message, F, Fixtures, F)
+{
+    F::client1.handleText([&](const ws::Request& request) {
+        BOOST_REQUIRE(request.message == "hello");
+        F::receivedMessage1 = true;
+        return "client1";
+    });
+    F::client2.handleText([&](const ws::Request& request) {
+        BOOST_REQUIRE(request.message == "hello");
+        F::receivedMessage2 = true;
+        return "client2";
+    });
+
+    std::set<uintptr_t> filteredClient;
+    F::server.handleOpen([&](const uintptr_t clientID) {
+        filteredClient.insert(clientID);
+        return std::vector<ws::Response>{{""}};
+    });
+    F::server.handleText([&](const ws::Request& request) {
+        if (request.message == "client1")
+            F::receivedReply1 = true;
+        else if (request.message == "client2")
+            F::receivedReply2 = true;
+        else
+            BOOST_REQUIRE(!"valid message");
+        return "";
+    });
+
+    connect(F::client1, F::server);
+    connect(F::client2, F::server);
+    BOOST_REQUIRE_EQUAL(F::server.getConnectionCount(), 2);
+
+    F::server.broadcastText("hello", filteredClient);
+    F::processAllClients(F::server);
+
+    BOOST_CHECK(!F::receivedMessage1);
+    BOOST_CHECK(!F::receivedMessage2);
+    BOOST_CHECK(!F::receivedReply1);
+    BOOST_CHECK(!F::receivedReply2);
+}
+
 BOOST_FIXTURE_TEST_CASE_TEMPLATE(server_broadcast_binary, F, Fixtures, F)
 {
     F::client1.handleBinary([&](const ws::Request& request) {
@@ -390,14 +431,14 @@ BOOST_FIXTURE_TEST_CASE_TEMPLATE(server_monitor_connections, F, Fixtures, F)
         return "";
     });
 
-    F::server.handleOpen([&] {
+    F::server.handleOpen([&](const uintptr_t) {
         ++numConnections;
         F::receivedConnect = true;
         return std::vector<ws::Response>{
             {"Connect", ws::Recipient::sender, ws::Format::text}};
     });
 
-    F::server.handleClose([&] {
+    F::server.handleClose([&](const uintptr_t) {
         --numConnections;
         F::receivedDisconnect = true;
         return std::vector<ws::Response>{};
@@ -418,7 +459,7 @@ BOOST_FIXTURE_TEST_CASE_TEMPLATE(server_monitor_connections, F, Fixtures, F)
 BOOST_FIXTURE_TEST_CASE_TEMPLATE(server_unspecified_format_response, F,
                                  Fixtures, F)
 {
-    F::server.handleOpen([&] {
+    F::server.handleOpen([&](const uintptr_t) {
         F::receivedConnect = true;
         return std::vector<ws::Response>{
             {"unspecified format", ws::Recipient::sender}};

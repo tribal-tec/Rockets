@@ -164,7 +164,7 @@ Receiver::~Receiver()
 
 void Receiver::connect(const std::string& method, VoidCallback action)
 {
-    bind(method, [action](Request) {
+    bind(method, [action](const Request&) {
         action();
         return Response{"\"OK\""};
     });
@@ -172,7 +172,7 @@ void Receiver::connect(const std::string& method, VoidCallback action)
 
 void Receiver::connect(const std::string& method, NotifyCallback action)
 {
-    bind(method, [action](Request request) {
+    bind(method, [action](const Request& request) {
         action(request);
         return Response{"\"OK\""};
     });
@@ -181,7 +181,7 @@ void Receiver::connect(const std::string& method, NotifyCallback action)
 void Receiver::bind(const std::string& method, ResponseCallback action)
 {
     bindAsync(method,
-              [this, action](Request req, AsyncResponse callback) {
+              [this, action](const Request& req, AsyncResponse callback) {
                   callback(action(req));
               });
 }
@@ -195,12 +195,12 @@ void Receiver::bindAsync(const std::string& method,
     _impl->methods[method] = action;
 }
 
-std::string Receiver::process(Request request)
+std::string Receiver::process(const Request& request)
 {
     return processAsync(request).get();
 }
 
-std::future<std::string> Receiver::processAsync(Request request)
+std::future<std::string> Receiver::processAsync(const Request& request)
 {
     auto promise = std::make_shared<std::promise<std::string>>();
     auto future = promise->get_future();
@@ -211,7 +211,7 @@ std::future<std::string> Receiver::processAsync(Request request)
     return future;
 }
 
-void Receiver::process(Request request, AsyncStringResponse callback)
+void Receiver::process(const Request& request, AsyncStringResponse callback)
 {
     const auto document = json::parse(request.message, nullptr, false);
     if (document.is_object())

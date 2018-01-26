@@ -55,8 +55,13 @@ enum class Recipient
  */
 struct Request
 {
-    Request(std::string message_, const uintptr_t clientID_ = 0)
+    Request(const std::string& message_, const uintptr_t clientID_ = 0)
         : message(message_)
+        , clientID(clientID_)
+    {}
+
+    Request(std::string&& message_, const uintptr_t clientID_ = 0)
+        : message(std::move(message_))
         , clientID(clientID_)
     {}
 
@@ -100,7 +105,7 @@ using MessageCallback = std::function<Response(Request)>;
 using MessageCallbackAsync = std::function<void(Request, ResponseCallback)>;
 
 /** Websocket callback for handling connection (open/close) messages. */
-using ConnectionCallback = std::function<std::vector<Response>()>;
+using ConnectionCallback = std::function<std::vector<Response>(uintptr_t)>;
 }
 }
 
