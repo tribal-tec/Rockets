@@ -126,6 +126,13 @@ public:
             return;
         }
 
+        // No reply for valid "notifications" (requests without an "id")
+        if (id.is_null())
+        {
+            callback(json());
+            return;
+        }
+
         const auto methodName = request["method"].get<std::string>();
         const auto method = methods.find(methodName);
         if (method == methods.end())
@@ -137,13 +144,6 @@ public:
         const auto params = request.find("params") == request.end() ? "" : dump(request["params"]);
         const auto& func = method->second;
         func({params, clientID}, [callback, id](const Response rep) {
-            // No reply for valid "notifications" (requests without an "id")
-            if (id.is_null())
-            {
-                callback(json());
-                return;
-            }
-
             if (rep.error != 0)
                 callback(makeErrorResponse(rep.error, rep.result, id));
             else
