@@ -478,3 +478,35 @@ BOOST_FIXTURE_TEST_CASE_TEMPLATE(server_unspecified_format_response, F,
     BOOST_CHECK(F::receivedConnect);
     BOOST_CHECK(!F::receivedConnectReply);
 }
+
+BOOST_FIXTURE_TEST_CASE_TEMPLATE(text_binary_exchange_with_unhandled_binary, F,
+                                 Fixtures, F)
+{
+    F::client1.handleText([&](const ws::Request& request) {
+        BOOST_CHECK_EQUAL(request.message, "bla");
+        return "";
+    });
+
+    connect(F::client1, F::server);
+
+    F::server.broadcastText("bla");
+    F::server.broadcastBinary("hello", 5);
+    F::server.broadcastText("bla");
+    F::processAllClients(F::server);
+}
+
+BOOST_FIXTURE_TEST_CASE_TEMPLATE(text_binary_exchange_with_unhandled_text, F,
+                                 Fixtures, F)
+{
+    F::client1.handleBinary([&](const ws::Request& request) {
+        BOOST_CHECK_EQUAL(request.message, "hello");
+        return "";
+    });
+
+    connect(F::client1, F::server);
+
+    F::server.broadcastBinary("hello", 5);
+    F::server.broadcastText("bla");
+    F::server.broadcastBinary("hello", 5);
+    F::processAllClients(F::server);
+}

@@ -51,7 +51,7 @@ json makeErrorResponse(const json& error, const json& id = json())
 }
 
 json makeErrorResponse(const int code, const std::string& message,
-                       const json& id = json())
+                       const json& id)
 {
     return makeErrorResponse(json{{"code", code}, {"message", message}}, id);
 }
@@ -84,8 +84,7 @@ public:
     std::string processBatchBlocking(const json& array, const uintptr_t clientID)
     {
         if (array.empty())
-            return dump(makeErrorResponse(invalidRequest));
-
+            return "";
         return dump(processValidBatchBlocking(array, clientID));
     }
 
@@ -120,16 +119,13 @@ public:
     void processCommand(const json& request, const uintptr_t clientID, std::function<void(json)> callback)
     {
         const auto id = request.count("id") ? request["id"] : json();
+        const bool isNotification = id.is_null();
         if (!_isValidJsonRpcRequest(request))
         {
-            callback(makeErrorResponse(invalidRequest, id));
-            return;
-        }
-
-        // No reply for valid "notifications" (requests without an "id")
-        if (id.is_null())
-        {
-            callback(json());
+            if(isNotification)
+                callback(json());
+            else
+                callback(makeErrorResponse(invalidRequest, id));
             return;
         }
 
@@ -137,13 +133,23 @@ public:
         const auto method = methods.find(methodName);
         if (method == methods.end())
         {
-            callback(makeErrorResponse(methodNotFound, id));
+            if(isNotification)
+                callback(json());
+            else
+                callback(makeErrorResponse(methodNotFound, id));
             return;
         }
 
         const auto params = request.find("params") == request.end() ? "" : dump(request["params"]);
         const auto& func = method->second;
         func({params, clientID}, [callback, id](const Response rep) {
+            // No reply for valid "notifications" (requests without an "id")
+            if (id.is_null())
+            {
+                callback(json());
+                return;
+            }
+
             if (rep.error != 0)
                 callback(makeErrorResponse(rep.error, rep.result, id));
             else

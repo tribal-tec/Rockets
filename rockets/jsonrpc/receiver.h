@@ -151,7 +151,7 @@ public:
                 return Response::invalidParams();
             try
             {
-                RetVal ret = action(std::move(params));
+                const auto& ret = action(std::move(params));
                 return Response{to_json(ret)};
             }
             catch (const response_error& e)

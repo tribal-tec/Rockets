@@ -61,8 +61,8 @@ void MessageHandler::handleMessage(Connection& connection, const char* data,
     }
     else if (format == Format::binary && callbackBinary)
         response = callbackBinary({std::move(_buffer), clientID});
-    else
-        _buffer.clear();
+
+    _buffer.clear();
 
     if (response.format == Format::unspecified)
         response.format = format;
