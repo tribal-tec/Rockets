@@ -75,7 +75,8 @@ Response makeResponse(const json& object)
     {
         const auto& error = object["error"];
         return Response{Response::Error{error["message"].get<std::string>(),
-                                        error["code"].get<int>()}};
+                                        error["code"].get<int>(),
+                        error.count("data") ? error["data"].dump(4) : "" }};
     }
     return Response{object["result"].dump(4)};
 }
@@ -108,6 +109,12 @@ std::future<Response> Requester::request(const std::string& method,
     };
     request(method, params, callback);
     return promise->get_future();
+}
+
+void Requester::cancelLastRequest()
+{
+    json cancel{{"id", _impl->lastId-1}};
+    notify("cancel", cancel.dump());
 }
 
 void Requester::request(const std::string& method, const std::string& params,

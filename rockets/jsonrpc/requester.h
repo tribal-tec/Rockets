@@ -50,6 +50,8 @@ public:
     std::future<Response> request(const std::string& method,
                                   const std::string& params);
 
+    void cancelLastRequest();
+
     /**
      * Make a request.
      *
