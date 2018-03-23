@@ -43,7 +43,7 @@ namespace jsonrpc
 class AsyncReceiver : public ReceiverInterface
 {
 public:
-    using CancelRequestCallback = std::function<void()>;
+    using CancelRequestCallback = std::function<void(std::string)>;
 
     /** Constructor. */
     AsyncReceiver();
@@ -77,14 +77,14 @@ public:
      */
     template <typename Params>
     void bindAsync(const std::string& method,
-                   std::function<void(Params, uintptr_t, AsyncResponse)> action,
+                   std::function<void(Params, std::string, AsyncResponse)> action,
                    CancelRequestCallback cancel)
     {
         bindAsync(method,
                   [action](const Request& request, AsyncResponse callback) {
                       Params params;
                       if (from_json(params, request.message))
-                          action(std::move(params), request.clientID, callback);
+                          action(std::move(params), request.requestID, callback);
                       else
                           callback(Response::invalidParams());
                   },

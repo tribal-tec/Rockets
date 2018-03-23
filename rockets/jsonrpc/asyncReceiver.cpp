@@ -51,12 +51,12 @@ public:
         _methods[method] = action;
     }
 
-    void _process(const json& requestID, const std::string& method,
+    void _process(const std::string& method,
                   const Request& request, JsonResponseCallback respond) final
     {
         if (method == cancelMethodName)
         {
-            processCancel(requestID, request);
+            processCancel(request);
             respond(json());
             return;
         }
@@ -65,12 +65,12 @@ public:
         if (cancelFunc != cancels.end())
         {
             std::lock_guard<std::mutex> lock(pendingRequests->mutex);
-            pendingRequests->requests[requestID] = {cancelFunc->second,
+            pendingRequests->requests[json::parse(request.requestID)] = {cancelFunc->second,
                                                     respond};
         }
 
         auto skipResponse = [
-            requestID, pendingRequests = cancelFunc != cancels.end()
+            requestID = request.requestID, pendingRequests = cancelFunc != cancels.end()
                                              ? pendingRequests
                                              : nullptr
         ]
@@ -81,31 +81,31 @@ public:
 
                 // if request has been cancelled and response is already sent,
                 // don't send another response
-                if (pendingRequests->requests.erase(requestID) == 0)
+                if (pendingRequests->requests.erase(json::parse(requestID)) == 0)
                     return true;
             }
             return false;
         };
 
         const auto& func = _methods[method];
-        func(request, [respond, requestID, skipResponse](const Response rep) {
+        func(request, [respond, requestID = request.requestID, skipResponse](const Response rep) {
             if (skipResponse())
                 return;
 
             // No reply for valid "notifications" (requests without an "id")
-            if (requestID.is_null())
+            if (requestID.empty())
                 respond(json());
             else
-                respond(makeResponse(rep, requestID));
+                respond(makeResponse(rep, json::parse(requestID)));
         });
     }
 
-    void processCancel(const json& id, const Request& request)
+    void processCancel(const Request& request)
     {
         auto params = json::parse(request.message, nullptr, false);
 
         // need a valid notification with the ID of the request to cancel
-        const bool isNotification = id.is_null();
+        const bool isNotification = request.requestID.empty();
         if (!isNotification || !params.count("id"))
             return;
 
@@ -119,7 +119,7 @@ public:
             return;
 
         // cancel callback to the application
-        cancelFunc->second.first();
+        cancelFunc->second.first(requestID.dump());
 
         // respond to request
         cancelFunc->second.second(makeErrorResponse(requestAborted, requestID));

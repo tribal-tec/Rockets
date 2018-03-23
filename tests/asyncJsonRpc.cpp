@@ -106,12 +106,12 @@ void substractArrAsyncForever(const jsonrpc::Request&, jsonrpc::AsyncResponse)
     forever.lock();
 }
 
-void cancelTooLongTakingFunction()
+void cancelTooLongTakingFunction(const std::string&)
 {
     forever.unlock();
 }
 
-void cancelNOP()
+void cancelNOP(const std::string&)
 {
 }
 

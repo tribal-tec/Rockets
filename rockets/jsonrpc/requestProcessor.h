@@ -65,7 +65,7 @@ private:
      * @param request 'params' field of the JSON-RPC request and the client ID
      * @param respond callback for responding JSON result of request processing
      */
-    virtual void _process(const json& requestID, const std::string& method,
+    virtual void _process(const std::string& method,
                           const Request& request,
                           JsonResponseCallback respond) = 0;
 

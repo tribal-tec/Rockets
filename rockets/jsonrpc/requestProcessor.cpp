@@ -137,7 +137,7 @@ void RequestProcessor::_processCommand(const json& request,
     const auto params =
         request.find("params") == request.end() ? "" : dump(request["params"]);
 
-    _process(id, methodName, {params, clientID}, respond);
+    _process(methodName, {params, clientID, id.is_null() ? "" : id.dump()}, respond);
 }
 }
 }

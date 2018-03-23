@@ -39,16 +39,16 @@ public:
         _methods[method] = action;
     }
 
-    void _process(const json& requestID, const std::string& method,
+    void _process(const std::string& method,
                   const Request& request, JsonResponseCallback respond) final
     {
         const auto& func = _methods[method];
-        func(request, [respond, requestID](const Response rep) {
+        func(request, [respond, requestID = request.requestID](const Response rep) {
             // No reply for valid "notifications" (requests without an "id")
-            if (requestID.is_null())
+            if (requestID.empty())
                 respond(json());
             else
-                respond(makeResponse(rep, requestID));
+                respond(makeResponse(rep, json::parse(requestID)));
         });
     }
 

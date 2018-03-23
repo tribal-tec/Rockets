@@ -55,20 +55,23 @@ enum class Recipient
  */
 struct Request
 {
-    Request(const std::string& message_, const uintptr_t clientID_ = 0)
+    Request(const std::string& message_, const uintptr_t clientID_ = 0, const std::string& requestID_ = {})
         : message(message_)
         , clientID(clientID_)
+        , requestID(requestID_)
     {
     }
 
-    Request(std::string&& message_, const uintptr_t clientID_ = 0)
+    Request(std::string&& message_, const uintptr_t clientID_ = 0, const std::string& requestID_ = {})
         : message(std::move(message_))
         , clientID(clientID_)
+        , requestID(requestID_)
     {
     }
 
     std::string message;
     const uintptr_t clientID;
+    const std::string requestID;
 };
 
 /**
