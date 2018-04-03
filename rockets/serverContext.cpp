@@ -26,6 +26,8 @@
 
 namespace rockets
 {
+void signal_cb(uv_signal_t *, int )
+{}
 ServerContext::ServerContext(const std::string& uri, const std::string& name,
                              const unsigned int threadCount,
                              lws_callback_function* callback,
@@ -41,6 +43,9 @@ ServerContext::ServerContext(const std::string& uri, const std::string& name,
     context = lws_create_context(&info);
     if (!context)
         throw std::runtime_error("libwebsocket init failed");
+
+    if(haveLibUV())
+        lws_uv_initloop(context, uv_default_loop(), &signal_cb, 0);
 }
 
 ServerContext::~ServerContext()
@@ -89,6 +94,11 @@ void ServerContext::cancelService()
     lws_cancel_service(context);
 }
 
+bool ServerContext::haveLibUV() const
+{
+    return !(uv_loop_alive(uv_default_loop()) == 0);
+}
+
 void ServerContext::createWebsocketsProtocol(lws_callback_function* wsCallback,
                                              void* user)
 {
@@ -116,5 +126,8 @@ void ServerContext::fillContextInfo(const std::string& uri,
     // service threads
     info.count_threads = threadCount;
     info.max_http_header_pool = threadCount;
+
+    if(haveLibUV())
+        info.options |= LWS_SERVER_OPTION_LIBUV;
 }
 }

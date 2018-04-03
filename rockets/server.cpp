@@ -65,11 +65,16 @@ public:
             serviceThreadPool = std::make_unique<ServiceThreadPool>(*context);
     }
 
+    bool haveLibUV() const
+    {
+        return context->haveLibUV();
+    }
+
     void requestBroadcast()
     {
         if (serviceThreadPool)
             serviceThreadPool->requestBroadcast();
-        else
+        else if(!haveLibUV())
             context->requestBroadcast();
     }
 
@@ -77,7 +82,7 @@ public:
     {
         std::lock_guard<std::mutex> lock{wsConnectionsMutex};
         wsConnections.emplace(wsi, ws::Connection{
-                                       std::make_unique<ws::Channel>(wsi)});
+                                       std::make_unique<ws::Channel>(wsi), haveLibUV()});
     }
 
     void closeWsConnection(lws* wsi)
@@ -181,7 +186,11 @@ void Server::broadcastText(const std::string& message)
 {
     std::lock_guard<std::mutex> lock{_impl->wsConnectionsMutex};
     for (auto& connection : _impl->wsConnections)
+    {
         connection.second.enqueueText(message);
+        if(_impl->haveLibUV())
+            connection.second.writeMessages();
+    }
     _impl->requestBroadcast();
 }
 
@@ -193,7 +202,11 @@ void Server::broadcastText(const std::string& message,
     {
         auto i = filter.find(reinterpret_cast<uintptr_t>(&connection.second));
         if (i == filter.end())
+        {
             connection.second.enqueueText(message);
+            if(_impl->haveLibUV())
+                connection.second.writeMessages();
+        }
     }
     _impl->requestBroadcast();
 }
@@ -202,7 +215,11 @@ void Server::broadcastBinary(const char* data, const size_t size)
 {
     std::lock_guard<std::mutex> lock{_impl->wsConnectionsMutex};
     for (auto& connection : _impl->wsConnections)
+    {
         connection.second.enqueueBinary({data, size});
+            if(_impl->haveLibUV())
+                connection.second.writeMessages();
+    }
     _impl->requestBroadcast();
 }
 

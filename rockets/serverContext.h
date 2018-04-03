@@ -57,6 +57,8 @@ public:
                  int events);
     void cancelService();
 
+    bool haveLibUV() const;
+
 private:
     lws_context* context = nullptr;
     std::string interface;

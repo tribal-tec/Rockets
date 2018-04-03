@@ -25,21 +25,28 @@ namespace rockets
 {
 namespace ws
 {
-Connection::Connection(std::unique_ptr<Channel> channel_)
+Connection::Connection(std::unique_ptr<Channel> channel_, bool directWrite)
     : channel{std::move(channel_)}
+    , _directWrite(directWrite)
 {
 }
 
 void Connection::sendText(std::string message)
 {
     enqueueText(std::move(message));
-    channel->requestWrite();
+    if(_directWrite)
+        writeMessages();
+    else
+        channel->requestWrite();
 }
 
 void Connection::sendBinary(std::string message)
 {
     enqueueBinary(std::move(message));
-    channel->requestWrite();
+    if(_directWrite)
+        writeMessages();
+    else
+        channel->requestWrite();
 }
 
 void Connection::writeMessages()

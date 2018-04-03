@@ -37,7 +37,7 @@ class Channel;
 class Connection
 {
 public:
-    explicit Connection(std::unique_ptr<Channel> channel);
+    explicit Connection(std::unique_ptr<Channel> channel, bool directWrite=false);
 
     /** Send a text message (will be queued for later processing). */
     void sendText(std::string message);
@@ -60,6 +60,7 @@ public:
 private:
     std::unique_ptr<Channel> channel;
     std::deque<std::pair<std::string, Format>> out;
+    const bool _directWrite;
 
     bool hasMessage() const;
     void writeOneMessage();
