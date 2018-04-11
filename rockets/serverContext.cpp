@@ -26,8 +26,10 @@
 
 namespace rockets
 {
+#if LWS_LIBRARY_VERSION_NUMBER < 2000000
 void signal_cb(uv_signal_t *, int )
 {}
+#endif
 ServerContext::ServerContext(const std::string& uri, const std::string& name,
                              const unsigned int threadCount,
                              lws_callback_function* callback,
@@ -45,7 +47,11 @@ ServerContext::ServerContext(const std::string& uri, const std::string& name,
         throw std::runtime_error("libwebsocket init failed");
 
     if(haveLibUV())
+#if LWS_LIBRARY_VERSION_NUMBER < 2000000
         lws_uv_initloop(context, uv_default_loop(), &signal_cb, 0);
+#else
+        lws_uv_initloop(context, uv_default_loop(), 0);
+#endif
 }
 
 ServerContext::~ServerContext()
