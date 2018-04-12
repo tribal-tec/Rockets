@@ -77,7 +77,9 @@ public:
         {
             if (pendingRequests)
             {
-                std::lock_guard<std::mutex> lock(pendingRequests->mutex);
+                std::unique_lock<std::mutex> lock{pendingRequests->mutex, std::defer_lock};
+                if (!lock.try_lock())
+                    return true;
 
                 // if request has been cancelled and response is already sent,
                 // don't send another response
