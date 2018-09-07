@@ -17,5 +17,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 # All rights reserved. Do not distribute without further notice.
 
-websocket-client~=0.48.0
+async-timeout~=3.0.0
+jsonrpcclient~=3.0.0
+websockets~=6.0
 semver~=2.7.9
