@@ -26,12 +26,12 @@ The Client manages a websocket connection to handle messaging with a remote Rock
 It runs in a thread and provides methods to send notifications and requests in JSON-RPC format.
 """
 
-import json
-import threading
-import time
-import websocket
+import asyncio
+import async_timeout
+import websockets
 
-JSON_RPC_VERSION = '2.0'
+from jsonrpcclient.clients.websockets_client import WebSocketsClient
+from jsonrpcclient.request import Request
 
 
 class Client:
@@ -51,12 +51,14 @@ class Client:
 
         :param str url: The address of the remote running Rockets instance.
         """
-        self._url = url + '/'
+        self._url = 'ws://' + url + '/'
 
         self._ws = None
-        self._ws_connected = False
-        self._request_id = 0
-        self._ws_requests = {}
+        self._ws_client = None
+
+        async def _connect():
+            await self._setup_websocket()
+        asyncio.get_event_loop().run_until_complete(_connect())
 
     def url(self):
         """
@@ -69,7 +71,22 @@ class Client:
 
     def connected(self):
         """Returns true if the websocket is connected to the remote Rockets instance."""
-        return self._ws_connected
+        return True if self._ws and self._ws.open else False
+
+    def notify(self, method, params=None):
+        """
+        Invoke an RPC on the remote running Rockets instance without waiting for a response.
+
+        :param str method: name of the method to invoke
+        :param str params: params for the method
+        """
+        async def _notify(method, params):
+            await self._setup_websocket()
+            if params:
+                await self._ws_client.notify(method, params)
+            else:
+                await self._ws_client.notify(method)
+        asyncio.get_event_loop().run_until_complete(_notify(method, params))
 
     def request(self, method, params=None, response_timeout=5):
         """
@@ -82,26 +99,16 @@ class Client:
         :rtype: dict
         :raises Exception: if request was not answered within given response_timeout
         """
-        request, result = self._make_request(method, params)
-
-        self._setup_websocket()
-        self._ws.send(json.dumps(request))
-
-        if response_timeout:
-            timeout = response_timeout * 10
-
-            while not result['done'] and timeout:
-                time.sleep(0.1)
-                timeout -= 1
-
-            if 'done' not in result:
-                raise Exception('Request was not answered within {0} seconds'
-                                .format(response_timeout))
-        else:
-            while not result['done']:
-                time.sleep(0.0001)
-
-        return result['result']
+        async def _request(method, params, response_timeout):
+            await self._setup_websocket()
+            with async_timeout.timeout(response_timeout):
+                if params:
+                    response = await self._ws_client.request(method, params)
+                else:
+                    response = await self._ws_client.request(method)
+                return response.data.result if response.data.ok else response.data.message
+        return asyncio.get_event_loop().run_until_complete(_request(method, params,
+                                                                    response_timeout))
 
     def batch_request(self, methods, params, response_timeout=5):
         """
@@ -112,172 +119,37 @@ class Client:
         :param int response_timeout: number of seconds to wait for the response
         :return: list of responses and/or errors of RPC
         :rtype: list
-        :raises Exception: if methods and/or params are not a list
+        :raises TypeError: if methods and/or params are not a list
         :raises Exception: if request was not answered within given response_timeout
         """
         if not isinstance(methods, list) and not isinstance(params, list):
-            raise Exception('Not a list of methods')
+            raise TypeError('Not a list of methods')
 
-        requests = list()
-        responses = list()
-        for method, param in zip(methods, params):
-            request, response = self._make_request(method, param)
-            requests.append(request)
-            responses.append(response)
+        async def _batch_request(methods, params, response_timeout):
+            await self._setup_websocket()
+            with async_timeout.timeout(response_timeout):
+                requests = list()
+                for method, param in zip(methods, params):
+                    requests.append(Request(method, param))
+                response = await self._ws_client.send(requests)
+                result = list()
+                for data in response.data:
+                    if data.ok:
+                        result.append(data.result)
+                    else:
+                        result.append(data.message)
+                return result
+        return asyncio.get_event_loop().run_until_complete(_batch_request(methods, params,
+                                                                          response_timeout))
 
-        self._setup_websocket()
-        self._ws.send(json.dumps(requests))
-
-        result = responses[0]
-        if response_timeout:
-            timeout = response_timeout * 10
-
-            while not result['done'] and timeout:
-                time.sleep(0.1)
-                timeout -= 1
-
-            if 'done' not in result:
-                raise Exception('Request was not answered within {0} seconds'
-                                .format(response_timeout))
-        else:
-            while not result['done']:
-                time.sleep(0.0001)
-
-        results = list()
-        for response in responses:
-            results.append(response['result'])
-
-        return results
-
-    def notify(self, method, params=None):
-        """
-        Invoke an RPC on the remote running Rockets instance without waiting for a response.
-
-        :param str method: name of the method to invoke
-        :param str params: params for the method
-        """
-        data = dict()
-        data['jsonrpc'] = JSON_RPC_VERSION
-        data['method'] = method
-        if params:
-            data['params'] = params
-
-        self._setup_websocket()
-        self._ws.send(json.dumps(data))
-
-    def _make_request(self, method, params=None):
-        """
-        Create a request object with given method and params and setup the response callback.
-
-        :param str method: name of the method to invoke
-        :param str params: params for the method
-        :return: request and response dict
-        :rtype: dict
-        """
-        request = dict()
-        request['jsonrpc'] = JSON_RPC_VERSION
-        request['id'] = self._request_id
-        request['method'] = method
-        if params:
-            request['params'] = params
-
-        response = {'done': False, 'result': None}
-
-        def callback(payload):
-            """
-            The callback for the response.
-
-            :param dict payload: the actual response data
-            """
-            response['result'] = payload
-            response['done'] = True
-
-        self._ws_requests[self._request_id] = callback
-        self._request_id += 1
-
-        return request, response
-
-    def _setup_websocket(self):
+    async def _setup_websocket(self):
         """
         Setups websocket to handle binary (image) and text (all properties) messages.
 
         The websocket app runs in a separate thread to unblock all notebook cells.
         """
-        if self._ws_connected:
+        if self.connected():
             return
 
-        def on_open(ws):
-            # pylint: disable=unused-argument
-            """Websocket is open, remember this state."""
-            self._ws_connected = True
-
-        def on_data(ws, data, data_type, cont):
-            # pylint: disable=unused-argument
-            """Websocket received data, handle it."""
-            if data_type == websocket.ABNF.OPCODE_TEXT:
-                data = json.loads(data)
-
-                # check if the received data is a response from a previous request
-                if self._handle_response(data):
-                    return
-            elif data_type == websocket.ABNF.OPCODE_BINARY:
-                pass
-
-        def on_close(ws):
-            # pylint: disable=unused-argument
-            """Websocket is closing, notify all registered callbacks to e.g. close widgets."""
-            self._ws_connected = False
-
-        websocket.enableTrace(False)
-
-        self._ws = websocket.WebSocketApp(self._url,
-                                          subprotocols=['rockets'], on_open=on_open,
-                                          on_data=on_data, on_close=on_close)
-        ws_thread = threading.Thread(target=self._ws.run_forever)
-        ws_thread.daemon = True
-        ws_thread.start()
-
-        conn_timeout = 5
-        while not self._ws_connected and conn_timeout:
-            time.sleep(0.2)
-            conn_timeout -= 1
-
-    def _handle_response(self, data):
-        """
-        Handle a potential JSON-RPC response message.
-
-        :param dict data: data of the reply, either a dict or a list (batch request)
-        :return: True if a request was handled, False otherwise
-        :rtype: bool
-        """
-        if 'id' not in data and not isinstance(data, list):
-            return False
-
-        if isinstance(data, list):
-            for response in data:
-                self._finish_request(response)
-        else:
-            self._finish_request(data)
-
-        return True
-
-    def _finish_request(self, data):
-        """
-        Extract payload from data which can be result or error and invoke the response callback.
-
-        :param dict data: data of the reply
-        """
-        payload = None
-        if 'result' in data:
-            payload = None if data['result'] == '' or data['result'] == 'OK' else data['result']
-        elif 'error' in data:
-            payload = data['error']
-
-        if data['id'] in self._ws_requests:
-            self._ws_requests[data['id']](payload)
-            self._ws_requests.pop(data['id'])
-        else:
-            if 'id' in data and data['id']:
-                print('Got error response for request ' + str(data['id']) + ': ' + str(payload))
-            else:
-                print('Got error response: ' + str(payload))
+        self._ws = await websockets.connect(self._url, subprotocols=['rockets'])
+        self._ws_client = WebSocketsClient(self._ws)
