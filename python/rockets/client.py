@@ -30,7 +30,8 @@ import asyncio
 import async_timeout
 import websockets
 
-from jsonrpcclient.clients.websockets_client import WebSocketsClient
+from .websockets_client import WebSocketsClient
+
 from jsonrpcclient.request import Request
 
 
