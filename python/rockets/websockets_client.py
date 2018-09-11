@@ -27,6 +27,8 @@ from websockets import WebSocketCommonProtocol  # type: ignore
 
 from jsonrpcclient.async_client import AsyncClient
 from jsonrpcclient.response import Response
+from typing import Any, Dict, Iterator, List, Optional, Union
+from jsonrpcclient.parse import parse
 
 
 class WebSocketsClient(AsyncClient):
@@ -41,20 +43,37 @@ class WebSocketsClient(AsyncClient):
         super().__init__(*args, **kwargs)
         self.socket = socket
 
+    async def send(
+        self,
+        request: Union[str, Dict, List],
+        trim_log_values: bool = False,
+        validate_against_schema: bool = True,
+        **kwargs: Any
+    ) -> Response:
+        """
+        Async version of Client.send.
+        """
+        # Convert the request to a string if it's not already.
+        request_text = request if isinstance(request, str) else json.dumps(request)
+        self.log_request(request_text, trim_log_values=trim_log_values)
+        response = await self.send_message(request_text, **kwargs)
+        self.log_response(response, trim_log_values=trim_log_values)
+        self.validate_response(response)
+        response.data = parse(
+            response.text, validate_against_schema=validate_against_schema
+        )
+        return response
+
     async def send_message(self, request: str, **kwargs: Any):  # type: ignore
         await self.socket.send(request)
 
-        # json_request = json.loads(request)
-        # if not 'id' in json_request:
-        #     return None
-
         done = False
         while not done:
-            response_text = await self.socket.recv()
-            if isinstance(response_text, (bytes, bytearray)):
-                continue
-            json_response = json.loads(str(response_text))
-            if 'method' in json_response and 'progress' in json_response['method']:
-                print(json_response['params']['amount'])
-            else:
-                return Response(response_text)
+            async for message in self.socket:
+                if isinstance(message, (bytes, bytearray, memoryview)):
+                    continue
+                json_response = json.loads(str(message))
+                if 'method' in json_response and 'progress' in json_response['method']:
+                    print(json_response['params']['amount'])
+                else:
+                    return Response(message)

@@ -19,5 +19,6 @@
 
 async-timeout~=3.0.0
 jsonrpcclient~=3.0.0
+rx~=1.6.1
 websockets~=6.0
 semver~=2.7.9
