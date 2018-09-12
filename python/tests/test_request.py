@@ -61,10 +61,19 @@ def test_param():
     assert_equal(client.request('double', [2]), 4)
 
 
+def test_param_as_not_a_list():
+    client = rockets.Client(server_url)
+    assert_equal(client.request('double', 2), 4)
+
+
 def test_method_not_found():
     client = rockets.Client(server_url)
-    assert_equal(client.request('foo'), {'code': -32601, 'message': 'Method not found'})
-
+    try:
+        client.request('foo')
+    except rockets.RequestError as e:
+        assert_equal(e.code, -32601)
+        assert_equal(e.message, 'Method not found')
+        
 
 if __name__ == '__main__':
     import nose
