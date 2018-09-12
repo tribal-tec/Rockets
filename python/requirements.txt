@@ -18,7 +18,7 @@
 # All rights reserved. Do not distribute without further notice.
 
 async-timeout~=3.0.0
-jsonrpcclient~=3.0.0
+json-rpc~=1.11.1
 rx~=1.6.1
 websockets~=6.0
 semver~=2.7.9

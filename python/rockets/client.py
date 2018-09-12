@@ -28,12 +28,18 @@ It runs in a thread and provides methods to send notifications and requests in J
 
 import asyncio
 import async_timeout
+import itertools
+import threading
 import websockets
 
-from .websockets_client import WebSocketsClient
-
-from jsonrpcclient.request import Request
-
+from rx import Observable, Observer
+from rx.concurrency import AsyncIOScheduler
+from jsonrpc.jsonrpc2 import (
+    JSONRPC20Request,
+    JSONRPC20BatchRequest,
+    JSONRPC20Response,
+    JSONRPC20BatchResponse,
+)
 
 class Client:
     """
@@ -54,12 +60,30 @@ class Client:
         """
         self._url = 'ws://' + url + '/'
 
+        self._ws_event_loop = asyncio.get_event_loop()
         self._ws = None
-        self._ws_client = None
+        self._id_generator = itertools.count(0)
 
         async def _connect():
             await self._setup_websocket()
-        asyncio.get_event_loop().run_until_complete(_connect())
+        self._ws_event_loop.run_until_complete(_connect())
+
+        def ws_loop(observer):
+            def thread_loop():                
+                asyncio.set_event_loop(self._ws_event_loop)
+                self._ws_event_loop.run_until_complete(self._ws_loop(observer))
+            ws_thread = threading.Thread(target=thread_loop)
+            ws_thread.start()            
+
+        self._ws_observable = Observable.create(ws_loop).publish().auto_connect()
+
+    async def _ws_loop(self, observer):    
+        try:
+            async for message in self._ws:
+                observer.on_next(message)
+        except websockets.exceptions.ConnectionClosed as e:
+            observer.on_error(e)
+        observer.on_completed()
 
     def url(self):
         """
@@ -74,6 +98,11 @@ class Client:
         """Returns true if the websocket is connected to the remote Rockets instance."""
         return True if self._ws and self._ws.open else False
 
+    def disconnect(self):
+        async def _disconnect():
+            await self._ws.close(reason='I hate Rockets')
+        asyncio.get_event_loop().run_until_complete(_disconnect())
+
     def notify(self, method, params=None):
         """
         Invoke an RPC on the remote running Rockets instance without waiting for a response.
@@ -84,9 +113,10 @@ class Client:
         async def _notify(method, params):
             await self._setup_websocket()
             if params:
-                await self._ws_client.notify(method, params)
+                notification = JSONRPC20Request(method, params, is_notification=True)
             else:
-                await self._ws_client.notify(method)
+                notification = JSONRPC20Request(method, is_notification=True)
+            await self._ws.send(notification.json)
         asyncio.get_event_loop().run_until_complete(_notify(method, params))
 
     def request(self, method, params=None, response_timeout=5):
@@ -100,16 +130,31 @@ class Client:
         :rtype: dict
         :raises Exception: if request was not answered within given response_timeout
         """
+        response = asyncio.Future()
         async def _request(method, params, response_timeout):
             await self._setup_websocket()
             with async_timeout.timeout(response_timeout):
                 if params:
-                    response = await self._ws_client.request(method, params)
+                    request = JSONRPC20Request(method, params, _id=next(self._id_generator))
                 else:
-                    response = await self._ws_client.request(method)
-                return response.data.result if response.data.ok else response.data.message
-        return asyncio.get_event_loop().run_until_complete(_request(method, params,
+                    request = JSONRPC20Request(method, _id=next(self._id_generator))
+
+
+                scheduler = AsyncIOScheduler()
+                self._ws_observable.subscribe_on(scheduler).subscribe(on_next=lambda value: response.set_result(value),
+                                              on_completed=lambda: print("Done!"),
+                                              on_error=lambda error: print("Error Occurred: {0}".format(error)))
+
+                await self._ws.send(request.json)
+
+                #return response.data.result if response.data.ok else response.data.message
+                #asyncio.ensure_future(response)
+        asyncio.get_event_loop().run_until_complete(_request(method, params,
                                                                     response_timeout))
+        asyncio.get_event_loop().run_until_complete(response)
+        import json
+        response_result = JSONRPC20Response(**json.loads(response.result()))
+        return response_result.result
 
     def batch_request(self, methods, params, response_timeout=5):
         """
@@ -126,22 +171,22 @@ class Client:
         if not isinstance(methods, list) and not isinstance(params, list):
             raise TypeError('Not a list of methods')
 
-        async def _batch_request(methods, params, response_timeout):
-            await self._setup_websocket()
-            with async_timeout.timeout(response_timeout):
-                requests = list()
-                for method, param in zip(methods, params):
-                    requests.append(Request(method, param))
-                response = await self._ws_client.send(requests)
-                result = list()
-                for data in response.data:
-                    if data.ok:
-                        result.append(data.result)
-                    else:
-                        result.append(data.message)
-                return result
-        return asyncio.get_event_loop().run_until_complete(_batch_request(methods, params,
-                                                                          response_timeout))
+        # async def _batch_request(methods, params, response_timeout):
+        #     await self._setup_websocket()
+        #     with async_timeout.timeout(response_timeout):
+        #         requests = list()
+        #         for method, param in zip(methods, params):
+        #             requests.append(Request(method, param))
+        #         response = await self._ws_client.send(requests)
+        #         result = list()
+        #         for data in response.data:
+        #             if data.ok:
+        #                 result.append(data.result)
+        #             else:
+        #                 result.append(data.message)
+        #         return result
+        # return asyncio.get_event_loop().run_until_complete(_batch_request(methods, params,
+        #                                                                   response_timeout))
 
     async def _setup_websocket(self):
         """
@@ -152,5 +197,4 @@ class Client:
         if self.connected():
             return
 
-        self._ws = await websockets.connect(self._url, subprotocols=['rockets'])
-        self._ws_client = WebSocketsClient(self._ws)
+        self._ws = await websockets.connect(self._url, subprotocols=['rockets'], loop=self._ws_event_loop)

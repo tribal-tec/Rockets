@@ -56,16 +56,18 @@ def test_no_param():
     assert_equal(client.request('ping'), 'pong')
 
 
-def test_param():
-    client = rockets.Client(server_url)
-    assert_equal(client.request('double', 2), 4)
+# def test_param():
+#     client = rockets.Client(server_url)
+#     assert_equal(client.request('double', 2), 4)
 
 
-def test_method_not_found():
-    client = rockets.Client(server_url)
-    assert_equal(client.request('foo'), 'Method not found')
+# def test_method_not_found():
+#     client = rockets.Client(server_url)
+#     assert_equal(client.request('foo'), 'Method not found')
 
 
 if __name__ == '__main__':
-    import nose
-    nose.run(defaultTest=__name__)
+    #import nose
+    #nose.run(defaultTest=__name__)
+    setup()
+    test_no_param()

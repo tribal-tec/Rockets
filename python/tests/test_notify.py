@@ -28,18 +28,20 @@ from nose.tools import assert_true, assert_false, assert_equal, raises
 from mock import Mock, patch
 import rockets
 
-got_ping = False
-hello_param = None
+from jsonrpcserver.exceptions import InvalidParams
+
+got_ping = asyncio.Future()
+hello_param = asyncio.Future()
 
 @methods.add
 async def ping():
     global got_ping
-    got_ping = True
+    got_ping.set_result(True)
 
 @methods.add
-async def hello(param):
+async def hello(name):
     global hello_param
-    hello_param = param
+    hello_param.set_result(name)
 
 async def server_handle(websocket, path):
     request = await websocket.recv()
@@ -59,35 +61,33 @@ def test_connect():
     assert_true(client.connected())
 
 
+def test_reconnect():
+    client = rockets.Client(server_url)
+    assert_equal(client.url(), 'ws://'+server_url+ '/')
+    assert_true(client.connected())
+    client.disconnect()
+    assert_false(client.connected())
+    client.notify('something_to_reconnect')
+    assert_true(client.connected())
+
+
 def test_no_param():
     client = rockets.Client(server_url)
-    assert_false(got_ping)
-    try:
-        client.notify('ping')
-    # Don't know why this closes the connection...
-    except websockets.exceptions.ConnectionClosed:
-        pass
+    client.notify('ping')
+    asyncio.get_event_loop().run_until_complete(got_ping)
     assert_true(got_ping)
 
 
 def test_param():
     client = rockets.Client(server_url)
-    try:
-        client.notify('hello', 'world')
-    # Don't know why this closes the connection...
-    except websockets.exceptions.ConnectionClosed:
-        pass
-    assert_equal(hello_param, 'world')
+    client.notify('hello', {'name':'world'})
+    asyncio.get_event_loop().run_until_complete(hello_param)
+    assert_equal(hello_param.result(), 'world')
 
 
 def test_method_not_found():
     client = rockets.Client(server_url)
-    try:
-        client.notify('pong')
-    # Don't know why this closes the connection...
-    except websockets.exceptions.ConnectionClosed:
-        pass
-
+    client.notify('pong')
 
 if __name__ == '__main__':
     import nose
