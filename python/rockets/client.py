@@ -29,7 +29,6 @@ It runs in a thread and provides methods to send notifications and requests in J
 import asyncio
 import async_timeout
 import itertools
-import threading
 import websockets
 
 from rx import Observable, Observer
@@ -60,20 +59,15 @@ class Client:
         """
         self._url = 'ws://' + url + '/'
 
-        self._ws_event_loop = asyncio.get_event_loop()
         self._ws = None
         self._id_generator = itertools.count(0)
 
         async def _connect():
             await self._setup_websocket()
-        self._ws_event_loop.run_until_complete(_connect())
+        asyncio.get_event_loop().run_until_complete(_connect())
 
         def ws_loop(observer):
-            def thread_loop():                
-                asyncio.set_event_loop(self._ws_event_loop)
-                self._ws_event_loop.run_until_complete(self._ws_loop(observer))
-            ws_thread = threading.Thread(target=thread_loop)
-            ws_thread.start()            
+            asyncio.ensure_future(self._ws_loop(observer)) 
 
         self._ws_observable = Observable.create(ws_loop).publish().auto_connect()
 
@@ -139,7 +133,6 @@ class Client:
                 else:
                     request = JSONRPC20Request(method, _id=next(self._id_generator))
 
-
                 scheduler = AsyncIOScheduler()
                 self._ws_observable.subscribe_on(scheduler).subscribe(on_next=lambda value: response.set_result(value),
                                               on_completed=lambda: print("Done!"),
@@ -154,7 +147,7 @@ class Client:
         asyncio.get_event_loop().run_until_complete(response)
         import json
         response_result = JSONRPC20Response(**json.loads(response.result()))
-        return response_result.result
+        return response_result.result if response_result.result else response_result.error
 
     def batch_request(self, methods, params, response_timeout=5):
         """
@@ -197,4 +190,4 @@ class Client:
         if self.connected():
             return
 
-        self._ws = await websockets.connect(self._url, subprotocols=['rockets'], loop=self._ws_event_loop)
+        self._ws = await websockets.connect(self._url, subprotocols=['rockets'])
