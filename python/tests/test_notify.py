@@ -74,7 +74,7 @@ def test_reconnect():
 def test_no_param():
     client = rockets.Client(server_url)
     client.notify('ping')
-    asyncio.get_event_loop().run_until_complete(got_ping)
+    asyncio.ensure_future(got_ping)
     assert_true(got_ping)
 
 

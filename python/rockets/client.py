@@ -183,14 +183,6 @@ class Client:
                 return response_future.result()
         except asyncio.CancelledError:
             await self._async_notify('cancel', {'id': request_id})
-            # #await response_future
-            # #print("####",response_future.exception)
-            # try:
-            #     await response_future
-            #     return response_future.result()
-            # except asyncio.CancelledError as identifier:
-            #     print("WTH",str(identifier))
-            #     return identifier
 
     def async_request(self, method, params, response_timeout):
         loop = asyncio.get_event_loop()
