@@ -103,82 +103,94 @@ class Client:
             await self._ws.close(reason='I hate Rockets')
         asyncio.get_event_loop().run_until_complete(_disconnect())
 
+    async def _async_notify(self, method, params):
+        await self._connect_ws()
+        if params:
+            notification = JSONRPC20Request(method, params, is_notification=True)
+        else:
+            notification = JSONRPC20Request(method, is_notification=True)
+        await self._ws.send(notification.json)
+
     def notify(self, method, params=None):
         """
         Invoke an RPC on the remote running Rockets instance without waiting for a response.
 
         :param str method: name of the method to invoke
         :param str params: params for the method
-        """
-        async def _notify(method, params):
-            await self._connect_ws()
-            if params:
-                notification = JSONRPC20Request(method, params, is_notification=True)
-            else:
-                notification = JSONRPC20Request(method, is_notification=True)
-            await self._ws.send(notification.json)
-        asyncio.get_event_loop().run_until_complete(_notify(method, params))
+        """        
+        asyncio.get_event_loop().run_until_complete(self._async_notify(method, params))
 
     async def _async_request(self, method, params, response_timeout):
-        await self._connect_ws()
-        with async_timeout.timeout(response_timeout):
-            request_id = next(self._id_generator)
-            if params:
-                if not isinstance(params, (list, tuple, dict)):
-                    params = [params]
-                request = JSONRPC20Request(method, params, _id=request_id)
-            else:
-                request = JSONRPC20Request(method, _id=request_id)
+        try:
+            await self._connect_ws()
+            with async_timeout.timeout(response_timeout):
+                request_id = next(self._id_generator)
+                if params:
+                    if not isinstance(params, (list, tuple, dict)):
+                        params = [params]
+                    request = JSONRPC20Request(method, params, _id=request_id)
+                else:
+                    request = JSONRPC20Request(method, _id=request_id)
 
-            def _to_response(value):
-                response = JSONRPC20Response(**json.loads(value))
-                if response.result:
-                    return response.result
-                raise RequestError(response.error['code'], response.error['message'])
+                def _to_response(value):
+                    response = JSONRPC20Response(**json.loads(value))
+                    if response.result:
+                        return response.result
+                    raise RequestError(response.error['code'], response.error['message'])
 
-            response_future = asyncio.Future()
+                response_future = asyncio.Future()
 
-            def _on_completed():
-                if not response_future.done():
-                    response_future.set_exception(SOCKET_CLOSED_ERROR)
+                def _on_completed():
+                    if not response_future.done():
+                        response_future.set_exception(SOCKET_CLOSED_ERROR)
 
-            def _response_filter(value):                    
-                response = json.loads(value)
-                return 'id' in response and response['id'] == request_id
+                def _response_filter(value):                    
+                    response = json.loads(value)
+                    return 'id' in response and response['id'] == request_id
 
-            self._json_observable \
-                .filter(_response_filter) \
-                .take(1) \
-                .map(_to_response) \
-                .subscribe(on_next=response_future.set_result,
-                           on_completed=_on_completed,
-                           on_error=response_future.set_exception)
+                self._json_observable \
+                    .filter(_response_filter) \
+                    .take(1) \
+                    .map(_to_response) \
+                    .subscribe(on_next=response_future.set_result,
+                               on_completed=_on_completed,
+                               on_error=response_future.set_exception)
 
-            def _progress_filter(value):
-                progress = json.loads(value)
-                return 'method' in progress and progress['method'] == 'progress' and \
-                    'params' in progress and 'id' in progress['params'] and \
-                    progress['params']['id'] == request_id
+                def _progress_filter(value):
+                    progress = json.loads(value)
+                    return 'method' in progress and progress['method'] == 'progress' and \
+                        'params' in progress and 'id' in progress['params'] and \
+                        progress['params']['id'] == request_id
 
-            def _to_progress(value):
-                progress = JSONRPC20Request.from_json(value)
-                return (progress.params['operation'], progress.params['amount'])
+                def _to_progress(value):
+                    progress = JSONRPC20Request.from_json(value)
+                    return (progress.params['operation'], progress.params['amount'])
 
-            task = asyncio.Task.current_task()
-            if task:
-                progress_observable = self._json_observable \
-                    .filter(_progress_filter) \
-                    .map(_to_progress) \
-                    .subscribe(task._call_progress_callbacks)
+                task = asyncio.Task.current_task()
+                if task:
+                    progress_observable = self._json_observable \
+                        .filter(_progress_filter) \
+                        .map(_to_progress) \
+                        .subscribe(task._call_progress_callbacks)
 
-                def _done_callback(future):
-                    progress_observable.dispose()                
+                    def _done_callback(future):
+                        progress_observable.dispose()                
 
-                response_future.add_done_callback(_done_callback)
+                    response_future.add_done_callback(_done_callback)
 
-            await self._ws.send(request.json)
-            await response_future
-            return response_future.result()
+                await self._ws.send(request.json)
+                await response_future
+                return response_future.result()
+        except asyncio.CancelledError:
+            await self._async_notify('cancel', {'id': request_id})
+            # #await response_future
+            # #print("####",response_future.exception)
+            # try:
+            #     await response_future
+            #     return response_future.result()
+            # except asyncio.CancelledError as identifier:
+            #     print("WTH",str(identifier))
+            #     return identifier
 
     def async_request(self, method, params, response_timeout):
         loop = asyncio.get_event_loop()

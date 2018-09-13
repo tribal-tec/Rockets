@@ -38,4 +38,3 @@ class RequestTask(asyncio.Task):
     def _call_progress_callbacks(self, value):
         for callback in self._progress_callbacks:
             callback(value)
-    
