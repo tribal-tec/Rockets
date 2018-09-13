@@ -32,8 +32,7 @@ import itertools
 import json
 import websockets
 
-from rx import Observable, Observer
-from rx.concurrency import AsyncIOScheduler
+from rx import Observable
 from jsonrpc.jsonrpc2 import (
     JSONRPC20Request,
     JSONRPC20BatchRequest,
@@ -41,7 +40,7 @@ from jsonrpc.jsonrpc2 import (
     JSONRPC20BatchResponse,
 )
 
-from .request_error import RequestError
+from .request_error import RequestError, SOCKET_CLOSED_ERROR
 
 
 class Client:
@@ -74,6 +73,8 @@ class Client:
             asyncio.ensure_future(self._ws_loop(observer)) 
 
         self._ws_observable = Observable.create(ws_loop).publish().auto_connect()
+        self._json_observable = self._ws_observable \
+            .filter(lambda value: not isinstance(value, (bytes, bytearray, memoryview)))
 
     async def _ws_loop(self, observer):    
         try:
@@ -128,7 +129,7 @@ class Client:
             else:
                 request = JSONRPC20Request(method, _id=request_id)
 
-            def _transform(value):
+            def _to_response(value):
                 response = JSONRPC20Response(**json.loads(value))
                 if response.result:
                     return response.result
@@ -140,20 +141,36 @@ class Client:
                 if not response_future.done():
                     response_future.set_exception(SOCKET_CLOSED_ERROR)
 
-            def _filter(value):                    
+            def _response_filter(value):                    
                 response = json.loads(value)
                 return 'id' in response and response['id'] == request_id
 
-            self._ws_observable \
-                .filter(_filter) \
+            self._json_observable \
+                .filter(_response_filter) \
                 .take(1) \
-                .map(_transform) \
+                .map(_to_response) \
                 .subscribe(on_next=response_future.set_result,
-                            on_completed=_on_completed,
-                            on_error=response_future.set_exception)
+                           on_completed=_on_completed,
+                           on_error=response_future.set_exception)
+
+            def _progress_filter(value):
+                progress = json.loads(value)
+                return 'method' in progress and progress['method'] == 'progress' and \
+                    'params' in progress and 'id' in progress['params'] and \
+                    progress['params']['id'] == request_id
+
+            def _to_progress(value):
+                progress = JSONRPC20Request.from_json(value)
+                return (progress.params['operation'], progress.params['amount'])
+
+            self._json_observable \
+                .filter(_progress_filter) \
+                .map(_to_progress) \
+                .subscribe(lambda value: print("Progress", value))
 
             await self._ws.send(request.json)
-            return response_future
+            await response_future
+            return response_future.result()
 
     def request(self, method, params=None, response_timeout=5):
         """
@@ -166,10 +183,9 @@ class Client:
         :rtype: dict
         :raises Exception: if request was not answered within given response_timeout
         """
-        loop = asyncio.get_event_loop()
-        response = loop.run_until_complete(self.async_request(method, params, response_timeout))
-        loop.run_until_complete(response)
-        return response.result()
+        task = asyncio.ensure_future(self.async_request(method, params, response_timeout))
+        asyncio.get_event_loop().run_until_complete(task)
+        return task.result()
 
     def batch_request(self, methods, params, response_timeout=5):
         """
