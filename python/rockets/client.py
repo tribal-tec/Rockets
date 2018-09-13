@@ -42,7 +42,7 @@ from jsonrpc.jsonrpc2 import (
 
 from .request_error import RequestError, SOCKET_CLOSED_ERROR
 from .request_task import RequestTask
-
+from .request_progress import RequestProgress
 
 class Client:
     """
@@ -164,7 +164,7 @@ class Client:
 
                 def _to_progress(value):
                     progress = JSONRPC20Request.from_json(value)
-                    return (progress.params['operation'], progress.params['amount'])
+                    return RequestProgress(progress.params['operation'], progress.params['amount'])
 
                 task = asyncio.Task.current_task()
                 if task:
