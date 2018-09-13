@@ -41,6 +41,7 @@ from jsonrpc.jsonrpc2 import (
 )
 
 from .request_error import RequestError, SOCKET_CLOSED_ERROR
+from .request_task import RequestTask
 
 
 class Client:
@@ -118,7 +119,7 @@ class Client:
             await self._ws.send(notification.json)
         asyncio.get_event_loop().run_until_complete(_notify(method, params))
 
-    async def async_request(self, method, params, response_timeout):
+    async def _async_request(self, method, params, response_timeout):
         await self._connect_ws()
         with async_timeout.timeout(response_timeout):
             request_id = next(self._id_generator)
@@ -163,14 +164,28 @@ class Client:
                 progress = JSONRPC20Request.from_json(value)
                 return (progress.params['operation'], progress.params['amount'])
 
-            self._json_observable \
-                .filter(_progress_filter) \
-                .map(_to_progress) \
-                .subscribe(lambda value: print("Progress", value))
+            task = asyncio.Task.current_task()
+            if task:
+                progress_observable = self._json_observable \
+                    .filter(_progress_filter) \
+                    .map(_to_progress) \
+                    .subscribe(task._call_progress_callbacks)
+
+                def _done_callback(future):
+                    progress_observable.dispose()                
+
+                response_future.add_done_callback(_done_callback)
 
             await self._ws.send(request.json)
             await response_future
             return response_future.result()
+
+    def async_request(self, method, params, response_timeout):
+        loop = asyncio.get_event_loop()
+        task_factory = lambda loop, coro: RequestTask(coro, loop=loop)
+        loop.set_task_factory(task_factory)
+
+        return asyncio.ensure_future(self._async_request(method, params, response_timeout))
 
     def request(self, method, params=None, response_timeout=5):
         """
@@ -183,8 +198,9 @@ class Client:
         :rtype: dict
         :raises Exception: if request was not answered within given response_timeout
         """
-        task = asyncio.ensure_future(self.async_request(method, params, response_timeout))
-        asyncio.get_event_loop().run_until_complete(task)
+
+        task = self.async_request(method, params, response_timeout)
+        asyncio.get_event_loop().run_until_complete(task)        
         return task.result()
 
     def batch_request(self, methods, params, response_timeout=5):
