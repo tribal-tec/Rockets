@@ -67,10 +67,6 @@ class Client:
         if not self._loop:
             self._loop = asyncio.get_event_loop()
 
-        connect_future = asyncio.ensure_future(self._connect_ws(), loop=self._loop)
-        if not self._loop.is_running():
-            self._loop.run_until_complete(connect_future)
-
         def ws_loop(observer):
             asyncio.ensure_future(self._ws_loop(observer), loop=self._loop) 
 
@@ -118,10 +114,10 @@ class Client:
 
         :param str method: name of the method to invoke
         :param str params: params for the method
-        """        
+        """
         self._loop.run_until_complete(self._async_notify(method, params))
 
-    async def _async_request(self, method, params, response_timeout):
+    async def _async_request(self, method, params, response_timeout, loop):
         try:
             await self._connect_ws()
             with async_timeout.timeout(response_timeout):
@@ -139,13 +135,13 @@ class Client:
                         return response.result
                     raise RequestError(response.error['code'], response.error['message'])
 
-                response_future = asyncio.Future(loop=self._loop)
+                response_future = asyncio.Future(loop=loop)
 
                 def _on_completed():
                     if not response_future.done():
                         response_future.set_exception(SOCKET_CLOSED_ERROR)
 
-                def _response_filter(value):                    
+                def _response_filter(value):
                     response = json.loads(value)
                     return 'id' in response and response['id'] == request_id
 
@@ -176,7 +172,7 @@ class Client:
                     return RequestProgress(progress.params['operation'], progress.params['amount'])
 
                 task = asyncio.Task.current_task()
-                if task:
+                if task and isinstance(task, RequestTask):
                     progress_observable = self._json_observable \
                         .filter(_progress_filter) \
                         .map(_to_progress) \
@@ -197,7 +193,7 @@ class Client:
         task_factory = lambda loop, coro: RequestTask(coro=coro, loop=loop)
         self._loop.set_task_factory(task_factory)
 
-        return asyncio.ensure_future(self._async_request(method, params, response_timeout), loop=self._loop)
+        return asyncio.ensure_future(self._async_request(method, params, response_timeout, self._loop), loop=self._loop)
 
     def request(self, method, params=None, response_timeout=5):
         """

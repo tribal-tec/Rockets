@@ -58,12 +58,12 @@ def setup():
 def test_connect():
     client = rockets.Client(server_url)
     assert_equal(client.url(), 'ws://'+server_url+ '/')
-    assert_true(client.connected())
+    assert_false(client.connected())
 
 
 def test_reconnect():
     client = rockets.Client(server_url)
-    assert_equal(client.url(), 'ws://'+server_url+ '/')
+    client.notify('something_to_connect')
     assert_true(client.connected())
     client.disconnect()
     assert_false(client.connected())
