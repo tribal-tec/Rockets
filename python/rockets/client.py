@@ -27,22 +27,19 @@ It runs in a thread and provides methods to send notifications and requests in J
 """
 
 import asyncio
-import async_timeout
 import itertools
 import json
+
+import async_timeout
 import websockets
-
+from jsonrpc.jsonrpc2 import (JSONRPC20BatchRequest, JSONRPC20BatchResponse,
+                              JSONRPC20Request, JSONRPC20Response)
 from rx import Observable
-from jsonrpc.jsonrpc2 import (
-    JSONRPC20Request,
-    JSONRPC20BatchRequest,
-    JSONRPC20Response,
-    JSONRPC20BatchResponse,
-)
 
-from .request_error import RequestError, SOCKET_CLOSED_ERROR
-from .request_task import RequestTask
+from .request_error import SOCKET_CLOSED_ERROR, RequestError
 from .request_progress import RequestProgress
+from .request_task import RequestTask
+
 
 class Client:
     """
@@ -51,7 +48,7 @@ class Client:
     It runs in a thread and provides methods to send notifications and requests in JSON-RPC format.
     """
 
-    def __init__(self, url):
+    def __init__(self, url, loop=None):
         """
         Initialize the Client, but don't setup the websocket connection yet.
 
@@ -66,12 +63,16 @@ class Client:
         self._ws = None
         self._id_generator = itertools.count(0)
 
-        connect_future = asyncio.ensure_future(self._connect_ws())
-        if not asyncio.get_event_loop().is_running():
-            asyncio.get_event_loop().run_until_complete(connect_future)
+        self._loop = loop
+        if not self._loop:
+            self._loop = asyncio.get_event_loop()
+
+        connect_future = asyncio.ensure_future(self._connect_ws(), loop=self._loop)
+        if not self._loop.is_running():
+            self._loop.run_until_complete(connect_future)
 
         def ws_loop(observer):
-            asyncio.ensure_future(self._ws_loop(observer)) 
+            asyncio.ensure_future(self._ws_loop(observer), loop=self._loop) 
 
         self._ws_observable = Observable.create(ws_loop).publish().auto_connect()
         self._json_observable = self._ws_observable \
@@ -101,7 +102,7 @@ class Client:
     def disconnect(self):
         async def _disconnect():
             await self._ws.close(reason='I hate Rockets')
-        asyncio.get_event_loop().run_until_complete(_disconnect())
+        self._loop.run_until_complete(_disconnect())
 
     async def _async_notify(self, method, params):
         await self._connect_ws()
@@ -118,7 +119,7 @@ class Client:
         :param str method: name of the method to invoke
         :param str params: params for the method
         """        
-        asyncio.get_event_loop().run_until_complete(self._async_notify(method, params))
+        self._loop.run_until_complete(self._async_notify(method, params))
 
     async def _async_request(self, method, params, response_timeout):
         try:
@@ -138,7 +139,7 @@ class Client:
                         return response.result
                     raise RequestError(response.error['code'], response.error['message'])
 
-                response_future = asyncio.Future()
+                response_future = asyncio.Future(loop=self._loop)
 
                 def _on_completed():
                     if not response_future.done():
@@ -193,11 +194,10 @@ class Client:
             await self._async_notify('cancel', {'id': request_id})
 
     def async_request(self, method, params, response_timeout):
-        loop = asyncio.get_event_loop()
         task_factory = lambda loop, coro: RequestTask(coro=coro, loop=loop)
-        loop.set_task_factory(task_factory)
+        self._loop.set_task_factory(task_factory)
 
-        return asyncio.ensure_future(self._async_request(method, params, response_timeout))
+        return asyncio.ensure_future(self._async_request(method, params, response_timeout), loop=self._loop)
 
     def request(self, method, params=None, response_timeout=5):
         """
@@ -210,9 +210,8 @@ class Client:
         :rtype: dict
         :raises Exception: if request was not answered within given response_timeout
         """
-
         task = self.async_request(method, params, response_timeout)
-        asyncio.get_event_loop().run_until_complete(task)
+        self._loop.run_until_complete(task)
         return task.result()
 
     def batch_request(self, methods, params, response_timeout=5):
@@ -254,4 +253,4 @@ class Client:
         if self.connected():
             return
 
-        self._ws = await websockets.connect(self._url, subprotocols=['rockets'])
+        self._ws = await websockets.connect(self._url, subprotocols=['rockets'], loop=self._loop)
