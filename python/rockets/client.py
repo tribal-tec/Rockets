@@ -66,9 +66,9 @@ class Client:
         self._ws = None
         self._id_generator = itertools.count(0)
 
-        async def _connect():
-            await self._connect_ws()
-        asyncio.get_event_loop().run_until_complete(_connect())
+        connect_future = asyncio.ensure_future(self._connect_ws())
+        if not asyncio.get_event_loop().is_running():
+            asyncio.get_event_loop().run_until_complete(connect_future)
 
         def ws_loop(observer):
             asyncio.ensure_future(self._ws_loop(observer)) 
@@ -148,13 +148,21 @@ class Client:
                     response = json.loads(value)
                     return 'id' in response and response['id'] == request_id
 
+                def _on_next(value):
+                    if not response_future.done():
+                        response_future.set_result(value)
+
+                def _on_error(value):
+                    if not response_future.done():
+                        response_future.set_exception(value)
+
                 self._json_observable \
                     .filter(_response_filter) \
                     .take(1) \
                     .map(_to_response) \
-                    .subscribe(on_next=response_future.set_result,
+                    .subscribe(on_next=_on_next,
                                on_completed=_on_completed,
-                               on_error=response_future.set_exception)
+                               on_error=_on_error)
 
                 def _progress_filter(value):
                     progress = json.loads(value)
@@ -186,7 +194,7 @@ class Client:
 
     def async_request(self, method, params, response_timeout):
         loop = asyncio.get_event_loop()
-        task_factory = lambda loop, coro: RequestTask(coro, loop=loop)
+        task_factory = lambda loop, coro: RequestTask(coro=coro, loop=loop)
         loop.set_task_factory(task_factory)
 
         return asyncio.ensure_future(self._async_request(method, params, response_timeout))
@@ -204,7 +212,7 @@ class Client:
         """
 
         task = self.async_request(method, params, response_timeout)
-        asyncio.get_event_loop().run_until_complete(task)        
+        asyncio.get_event_loop().run_until_complete(task)
         return task.result()
 
     def batch_request(self, methods, params, response_timeout=5):
