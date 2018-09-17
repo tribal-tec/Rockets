@@ -30,4 +30,4 @@ class RequestProgress:
         self.amount = amount
 
     def __str__(self):
-        return str((self.operation, str(self.amount)))
+        return str((self.operation, self.amount))

@@ -71,14 +71,14 @@ class Client:
             asyncio.ensure_future(self._ws_loop(observer), loop=self._loop)
 
         self._ws_observable = Observable.create(ws_loop).publish().auto_connect()
-        self._json_observable = self._ws_observable \
+        self._json_stream = self._ws_observable \
             .filter(lambda value: not isinstance(value, (bytes, bytearray, memoryview)))
 
     async def _ws_loop(self, observer):    
         try:
             async for message in self._ws:
                 observer.on_next(message)
-        except websockets.exceptions.ConnectionClosed as e:
+        except websockets.exceptions.ConnectionClosed as e: # pragma: no cover
             observer.on_error(e)
         observer.on_completed()
 
@@ -119,9 +119,9 @@ class Client:
 
     async def _async_request(self, method, params, response_timeout, loop):
         try:
+            request_id = next(self._id_generator)
             await self._connect_ws()
             with async_timeout.timeout(response_timeout):
-                request_id = next(self._id_generator)
                 if params:
                     if not isinstance(params, (list, tuple, dict)):
                         params = [params]
@@ -152,11 +152,11 @@ class Client:
                         else:
                             response_future.set_result(value)
 
-                def _on_error(value):
+                def _on_error(value): # pragma: no cover
                     if not response_future.done():
                         response_future.set_exception(value)
 
-                self._json_observable \
+                self._json_stream \
                     .filter(_response_filter) \
                     .take(1) \
                     .map(_to_response) \
@@ -164,19 +164,20 @@ class Client:
                                on_completed=_on_completed,
                                on_error=_on_error)
 
-                def _progress_filter(value):
-                    progress = json.loads(value)
-                    return 'method' in progress and progress['method'] == 'progress' and \
-                        'params' in progress and 'id' in progress['params'] and \
-                        progress['params']['id'] == request_id
-
-                def _to_progress(value):
-                    progress = JSONRPC20Request.from_json(value)
-                    return RequestProgress(progress.params['operation'], progress.params['amount'])
-
                 task = asyncio.Task.current_task()
                 if task and isinstance(task, RequestTask):
-                    progress_observable = self._json_observable \
+                    def _progress_filter(value):
+                        progress = json.loads(value)
+                        return 'method' in progress and progress['method'] == 'progress' and \
+                            'params' in progress and 'id' in progress['params'] and \
+                            progress['params']['id'] == request_id
+
+                    def _to_progress(value):
+                        progress = JSONRPC20Request.from_json(value).params
+                        return RequestProgress(progress['operation'],
+                                               progress['amount'])
+
+                    progress_observable = self._json_stream \
                         .filter(_progress_filter) \
                         .map(_to_progress) \
                         .subscribe(task._call_progress_callbacks)
@@ -247,7 +248,7 @@ class Client:
 
     async def _connect_ws(self):
         """
-        Connect websocket to _url if not connected yet/
+        Connect websocket to self._url if not connected yet.
         """
         if self.connected():
             return
