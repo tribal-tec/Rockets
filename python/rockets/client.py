@@ -68,7 +68,7 @@ class Client:
             self._loop = asyncio.get_event_loop()
 
         def ws_loop(observer):
-            asyncio.ensure_future(self._ws_loop(observer), loop=self._loop) 
+            asyncio.ensure_future(self._ws_loop(observer), loop=self._loop)
 
         self._ws_observable = Observable.create(ws_loop).publish().auto_connect()
         self._json_observable = self._ws_observable \
@@ -133,7 +133,7 @@ class Client:
                     response = JSONRPC20Response(**json.loads(value))
                     if response.result:
                         return response.result
-                    raise RequestError(response.error['code'], response.error['message'])
+                    return response.error
 
                 response_future = asyncio.Future(loop=loop)
 
@@ -147,7 +147,10 @@ class Client:
 
                 def _on_next(value):
                     if not response_future.done():
-                        response_future.set_result(value)
+                        if isinstance(value, dict) and 'code' in value:
+                            response_future.set_exception(RequestError(value['code'], value['message']))
+                        else:
+                            response_future.set_result(value)
 
                 def _on_error(value):
                     if not response_future.done():
@@ -189,7 +192,7 @@ class Client:
         except asyncio.CancelledError:
             await self._async_notify('cancel', {'id': request_id})
 
-    def async_request(self, method, params, response_timeout):
+    def async_request(self, method, params=None, response_timeout=None):
         task_factory = lambda loop, coro: RequestTask(coro=coro, loop=loop)
         self._loop.set_task_factory(task_factory)
 
