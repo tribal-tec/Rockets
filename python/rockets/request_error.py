@@ -20,16 +20,18 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 # All rights reserved. Do not distribute without further notice.
 
-"""
+"""Reports the error code and message of a request that has failed."""
 
-"""
 
 class RequestError(Exception):
-    def __init__(self, code, message):
+    """Reports the error code and message of a request that has failed."""
 
+    def __init__(self, code, message):
+        """Init base class and setup code and message"""
         super(RequestError, self).__init__(message)
 
         self.code = code
         self.message = message
+
 
 SOCKET_CLOSED_ERROR = RequestError(-30100, 'Socket connection closed')

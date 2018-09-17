@@ -20,21 +20,28 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 # All rights reserved. Do not distribute without further notice.
 
-"""
-
-"""
+"""Extend asyncio.Task to add callbacks for progress reporting while the request is not done."""
 
 import asyncio
 
+
 class RequestTask(asyncio.Task):
-    
+    """Extend asyncio.Task to add callbacks for progress reporting while the request is not done."""
+
     def __init__(self, coro, *, loop=None):
+        """Init base class and setup empty progress callbacks"""
         super().__init__(coro=coro, loop=loop)
         self._progress_callbacks = []
 
     def add_progress_callback(self, fn):
+        """
+        Add a callback to be run everytime a progress update arrives.
+
+        The callback is called with a single argument - the RequestProgress object.
+        """
         self._progress_callbacks.append(fn)
 
     def _call_progress_callbacks(self, value):
+        """Internal: Calls registered progress callbacks."""
         for callback in self._progress_callbacks:
             callback(value)

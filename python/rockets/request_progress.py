@@ -20,14 +20,22 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 # All rights reserved. Do not distribute without further notice.
 
-"""
+"""Reports the operation and amount of a request."""
 
-"""
 
 class RequestProgress:
+    """Reports the operation and amount of a request."""
+
     def __init__(self, operation, amount):
+        """Setup operation and amount"""
         self.operation = operation
         self.amount = amount
 
     def __str__(self):
+        """
+        Print progress as string
+
+        :return: tuple(operation,amount)
+        :rtype: str
+        """
         return str((self.operation, self.amount))
