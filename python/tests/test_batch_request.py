@@ -51,20 +51,21 @@ def setup():
     server_url = 'localhost:'+str(server.sockets[0].getsockname()[1])
 
 
-# def test_batch():
-#     client = rockets.Client(server_url)
-#     assert_equal(client.batch_request(['double', 'double'], [2, 4]), [4, 8])
+def test_batch():
+    client = rockets.Client(server_url)
+    assert_equal(client.batch_request(['double', 'double'], [[2], [4]]), [4, 8])
 
 
-# @raises(TypeError)
-# def test_invalid_args():
-#     client = rockets.Client(server_url)
-#     client.batch_request('foo', 'bar')
+@raises(TypeError)
+def test_invalid_args():
+    client = rockets.Client(server_url)
+    client.batch_request('foo', 'bar')
 
 
-# def test_method_not_found():
-#     client = rockets.Client(server_url)
-#     assert_equal(client.batch_request(['foo'], ['bar']), ['Method not found'])
+def test_method_not_found():
+    client = rockets.Client(server_url)
+    assert_equal(client.batch_request(['foo'], [['bar']]),
+                 [{'code': -32601, 'message': 'Method not found'}])
 
 
 if __name__ == '__main__':
