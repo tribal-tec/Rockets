@@ -24,6 +24,6 @@
 from pkg_resources import get_distribution, DistributionNotFound
 
 try:
-    VERSION = get_distribution('rockets').version  # pylint: disable=no-member
+    VERSION = get_distribution('rockets').version
 except DistributionNotFound:  # pragma: no cover
     VERSION = 'rockets-local'

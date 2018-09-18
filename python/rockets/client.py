@@ -207,7 +207,7 @@ class Client:
                 .map(_to_progress) \
                 .subscribe(task._call_progress_callbacks)  # pylint: disable=W0212
 
-            def _done_callback(future):  # pylint: disable=unused-argument
+            def _done_callback(future):  # pylint: disable=W0613
                 progress_observable.dispose()
 
             response_future.add_done_callback(_done_callback)
