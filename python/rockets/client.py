@@ -75,8 +75,18 @@ class Client:
         # pylint: disable=E1101
         self._ws_observable = Observable.create(ws_loop).publish().auto_connect()
         # pylint: enable=E1101
+
+        def _json_filter(value):
+            try:
+                json.loads(value)
+                return True
+            except ValueError:  # pragma: no cover
+                return False
+
         self._json_stream = self._ws_observable \
-            .filter(lambda value: not isinstance(value, (bytes, bytearray, memoryview)))
+            .filter(lambda value: not isinstance(value, (bytes, bytearray, memoryview))) \
+            .filter(_json_filter) \
+            .map(json.loads)
 
     def url(self):
         """
@@ -262,11 +272,10 @@ class Client:
 
     def _setup_response_filter(self, response_future, request_id):
         def _response_filter(value):
-            response = json.loads(value)
-            return 'id' in response and response['id'] == request_id
+            return 'id' in value and value['id'] == request_id
 
         def _to_response(value):
-            response = JSONRPC20Response(**json.loads(value))
+            response = JSONRPC20Response(**value)
             if response.result:
                 return response.result
             return response.error
@@ -291,15 +300,13 @@ class Client:
 
     def _setup_batch_response_filter(self, response_future, request_ids):
         def _response_filter(value):
-            responses_json = json.loads(value)
-            for response in responses_json:
+            for response in value:
                 if 'id' not in response or response['id'] not in request_ids:
                     return False  # pragma: no cover
             return True
 
         def _to_response(value):
-            responses_json = json.loads(value)
-            responses = [JSONRPC20Response(**i) for i in responses_json]
+            responses = [JSONRPC20Response(**i) for i in value]
             result = list()
             for response in responses:
                 if response.result:
@@ -327,13 +334,12 @@ class Client:
         task = asyncio.Task.current_task()
         if task and isinstance(task, RequestTask):
             def _progress_filter(value):
-                progress = json.loads(value)
-                return 'method' in progress and progress['method'] == 'progress' and \
-                    'params' in progress and 'id' in progress['params'] and \
-                    progress['params']['id'] == request_id
+                return 'method' in value and value['method'] == 'progress' and \
+                    'params' in value and 'id' in value['params'] and \
+                    value['params']['id'] == request_id
 
             def _to_progress(value):
-                progress = JSONRPC20Request.from_json(value).params
+                progress = JSONRPC20Request.from_data(value).params
                 return RequestProgress(progress['operation'], progress['amount'])
 
             progress_observable = self._json_stream \

@@ -47,16 +47,16 @@ async def server_handle(websocket, path):
     request = await websocket.recv()
 
     json_request = json.loads(request)
-    if json_request['method'] == 'test_progress':
+    method = json_request['method']
+    if method == 'test_progress':
         progress_notification = JSONRPC20Request('progress', {
             'amount': 0.5,
             'operation': 'almost done',
             'id': json_request['id']}, is_notification=True)
         await websocket.send(progress_notification.json)
         response = RequestResponse(json_request['id'], 'DONE')
-    elif json_request['method'] == 'test_cancel':
+    elif method == 'test_cancel':
         cancel_request = await websocket.recv()
-        print("GOT CANCEL", cancel_request)
         response = RequestResponse(json_request['id'], 'CANCELLED')
     else:
         response = await methods.dispatch(request)

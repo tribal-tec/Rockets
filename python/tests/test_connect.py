@@ -77,6 +77,7 @@ def test_reconnect():
     client.connect()
     assert_true(client.connected())
 
+
 if __name__ == '__main__':
     import nose
     nose.run(defaultTest=__name__)
