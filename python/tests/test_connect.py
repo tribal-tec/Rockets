@@ -22,41 +22,60 @@
 
 import asyncio
 import websockets
-from jsonrpcserver.response import RequestResponse
 
-from nose.tools import assert_true, assert_false, assert_equal, raises
+from nose.tools import assert_true, assert_false, assert_equal
 import rockets
 
 
-async def hello(websocket, path):
-    name = await websocket.recv()
-    greeting = f"Hello {name}!"
-    await websocket.send(greeting)
+async def server_handle(websocket, path):
+    await websocket.recv()
 
 server_url = None
 def setup():
-    start_server = websockets.serve(hello, 'localhost')
+    start_server = websockets.serve(server_handle, 'localhost')
     server = asyncio.get_event_loop().run_until_complete(start_server)
     global server_url
     server_url = 'localhost:'+str(server.sockets[0].getsockname()[1])
 
 
-def test_subscribe():
+def test_connect_ws():
+    client = rockets.Client('ws://'+server_url)
+    assert_equal(client.url(), 'ws://'+server_url)
+    assert_false(client.connected())
+
+
+def test_connect_wss():
+    client = rockets.Client('wss://'+server_url)
+    assert_equal(client.url(), 'wss://'+server_url)
+    assert_false(client.connected())
+
+
+def test_connect_http():
+    client = rockets.Client('http://'+server_url)
+    assert_equal(client.url(), 'ws://'+server_url)
+    assert_false(client.connected())
+
+
+def test_connect_https():
+    client = rockets.Client('https://'+server_url)
+    assert_equal(client.url(), 'wss://'+server_url)
+    assert_false(client.connected())
+
+
+def test_connect():
     client = rockets.Client(server_url)
+    assert_equal(client.url(), 'ws://'+server_url)
+    assert_false(client.connected())
 
+
+def test_reconnect():
+    client = rockets.Client(server_url)
     client.connect()
-    async def _do_it():
-        received = asyncio.Future()
-        def _on_message(message):
-            assert_equal(message, 'Hello Rockets!')
-            received.set_result(True)
-
-        client.as_observable().subscribe(_on_message)
-        await client.send("Rockets")
-        await received
-
-    asyncio.get_event_loop().run_until_complete(_do_it())
-
+    assert_true(client.connected())
+    client.disconnect()
+    assert_false(client.connected())
+    client.connect()
+    assert_true(client.connected())
 
 if __name__ == '__main__':
     import nose

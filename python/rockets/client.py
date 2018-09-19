@@ -38,6 +38,7 @@ from rx import Observable
 from .request_error import SOCKET_CLOSED_ERROR, RequestError
 from .request_progress import RequestProgress
 from .request_task import RequestTask
+from .utils import set_ws_protocol
 
 
 class Client:
@@ -58,7 +59,7 @@ class Client:
         :param str url: The address of the remote running Rockets instance.
         :param asyncio.AbstractEventLoop loop: Event loop where this client should run in
         """
-        self._url = 'ws://' + url + '/'
+        self._url = set_ws_protocol(url)
 
         self._ws = None
         self._id_generator = itertools.count(0)
@@ -104,9 +105,11 @@ class Client:
         """
         return self._ws_observable
 
-    async def connect(self):
+    def connect(self):
         """Connect this client to the remote Rockets server"""
-        await self._connect_ws()
+        async def _connect():
+            await self._connect_ws()
+        self._loop.run_until_complete(_connect())
 
     def disconnect(self):
         """Disconnect this client from the remote Rockets server."""

@@ -53,22 +53,6 @@ def setup():
     server_url = 'localhost:'+str(server.sockets[0].getsockname()[1])
 
 
-def test_connect():
-    client = rockets.Client(server_url)
-    assert_equal(client.url(), 'ws://'+server_url+ '/')
-    assert_false(client.connected())
-
-
-def test_reconnect():
-    client = rockets.Client(server_url)
-    client.notify('something_to_connect')
-    assert_true(client.connected())
-    client.disconnect()
-    assert_false(client.connected())
-    client.notify('something_to_reconnect')
-    assert_true(client.connected())
-
-
 def test_no_param():
     client = rockets.Client(server_url)
     client.notify('hello')
