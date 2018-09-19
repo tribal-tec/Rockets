@@ -27,9 +27,9 @@ from jsonrpcserver.aio import methods
 from jsonrpcserver.response import RequestResponse
 import json
 
-from nose.tools import assert_true, assert_false, assert_equal, raises
-from mock import Mock, patch
+from nose.tools import assert_true, assert_equal, raises
 import rockets
+
 
 @methods.add
 async def ping():
@@ -100,7 +100,7 @@ def test_method_not_found():
 
 
 @raises(rockets.request_error.RequestError)
-def test_error_on_connection_lost(): 
+def test_error_on_connection_lost():
     client = rockets.Client(server_url)
     # do one request, which finishes the server, so the second request will throw an error
     assert_equal(client.request('ping'), 'pong')

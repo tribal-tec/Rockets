@@ -23,11 +23,12 @@
 import asyncio
 import websockets
 from jsonrpcserver.aio import methods
-from jsonrpcserver.response import NotificationResponse
+from jsonrpcserver.response import RequestResponse
+import json
 
-from nose.tools import assert_true, assert_false, assert_equal, raises
-from mock import Mock, patch
+from nose.tools import assert_true, assert_equal, raises
 import rockets
+
 
 @methods.add
 async def ping():
@@ -39,7 +40,14 @@ async def double(value):
 
 async def server_handle(websocket, path):
     request = await websocket.recv()
-    response = await methods.dispatch(request)
+
+    json_request = json.loads(request)
+    if isinstance(json_request, list) and any(i['method'] == 'test_cancel' for i in json_request):
+        cancel_request = await websocket.recv()
+        print("GOT CANCEL", cancel_request)
+        response = RequestResponse(json_request['id'], 'CANCELLED')
+    else:
+        response = await methods.dispatch(request)
     if not response.is_notification:
         await websocket.send(str(response))
 
@@ -66,6 +74,36 @@ def test_method_not_found():
     client = rockets.Client(server_url)
     assert_equal(client.batch_request(['foo'], [['bar']]),
                  [{'code': -32601, 'message': 'Method not found'}])
+
+
+@raises(rockets.request_error.RequestError)
+def test_error_on_connection_lost():
+    client = rockets.Client(server_url)
+    # do one request, which finishes the server, so the second request will throw an error
+    assert_equal(client.request('ping'), 'pong')
+    assert_equal(client.batch_request(['double', 'double'], [[2], [4]]), [4, 8])
+
+
+def test_cancel():
+    client = rockets.Client(server_url)
+    request_task = client.async_batch_request(['test_cancel', 'test_cancel'], [[],[]])
+
+    def _on_done(value):
+        assert_equal(value.result(), None)
+        asyncio.get_event_loop().stop()
+
+    async def _do_cancel():
+        asyncio.sleep(10)
+        request_task.cancel()
+
+    request_task.add_done_callback(_on_done)
+
+    asyncio.ensure_future(request_task)
+    asyncio.ensure_future(_do_cancel())
+
+    asyncio.get_event_loop().run_forever()
+
+    assert_true(request_task.done())
 
 
 if __name__ == '__main__':

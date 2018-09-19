@@ -24,11 +24,9 @@ import asyncio
 import websockets
 from jsonrpcserver.aio import methods
 
-from nose.tools import assert_true, assert_false, assert_equal, raises
-from mock import Mock, patch
+from nose.tools import assert_true, assert_false, assert_equal
 import rockets
 
-from jsonrpcserver.exceptions import InvalidParams
 
 got_ping = asyncio.Future()
 hello_param = asyncio.Future()
@@ -74,8 +72,8 @@ def test_reconnect():
 def test_no_param():
     client = rockets.Client(server_url)
     client.notify('ping')
-    asyncio.ensure_future(got_ping)
-    assert_true(got_ping)
+    asyncio.get_event_loop().run_until_complete(got_ping)
+    assert_true(got_ping.result)
 
 
 def test_param():

@@ -95,11 +95,33 @@ class Client:
         """
         return True if self._ws and self._ws.open else False
 
+    def as_observable(self):
+        """
+        Return the websocket stream as an rx observable to subscribe to it.
+
+        :return: the websocket observable
+        :rtype: rx.Observable
+        """
+        return self._ws_observable
+
+    async def connect(self):
+        """Connect this client to the remote Rockets server"""
+        await self._connect_ws()
+
     def disconnect(self):
         """Disconnect this client from the remote Rockets server."""
         async def _disconnect():
             await self._ws.close()
         self._loop.run_until_complete(_disconnect())
+
+    async def send(self, message):
+        """
+        Send any message to the connected remote Rockets server.
+
+        :param str message: The message to send
+        """
+        await self._connect_ws()
+        await self._ws.send(message)
 
     def notify(self, method, params=None):
         """
@@ -176,11 +198,8 @@ class Client:
 
     async def _ws_loop(self, observer):
         """Internal: The loop for feeding an rxpy observer."""
-        try:
-            async for message in self._ws:
-                observer.on_next(message)
-        except websockets.exceptions.ConnectionClosed as e:  # pragma: no cover
-            observer.on_error(e)
+        async for message in self._ws:
+            observer.on_next(message)
         observer.on_completed()
 
     async def _async_notify(self, method, params):
@@ -234,9 +253,11 @@ class Client:
                 await self._ws.send(request.json)
                 await response_future
                 return response_future.result()
-        except asyncio.CancelledError:  # pragma: no cover
+        except asyncio.CancelledError:
             for request_id in request_ids:
                 await self._async_notify('cancel', {'id': request_id})
+                # map(lambda request_id: self._async_notify('cancel', {'id': request_id}),
+                # request_ids)
 
     def _setup_response_filter(self, response_future, request_id):
         def _response_filter(value):
@@ -260,17 +281,12 @@ class Client:
             if not response_future.done():
                 response_future.set_exception(SOCKET_CLOSED_ERROR)
 
-        def _on_error(value):  # pragma: no cover
-            if not response_future.done():
-                response_future.set_exception(value)
-
         self._json_stream \
             .filter(_response_filter) \
             .take(1) \
             .map(_to_response) \
             .subscribe(on_next=_on_next,
-                       on_completed=_on_completed,
-                       on_error=_on_error)
+                       on_completed=_on_completed)
 
     def _setup_batch_response_filter(self, response_future, request_ids):
         def _response_filter(value):
@@ -297,19 +313,14 @@ class Client:
 
         def _on_completed():
             if not response_future.done():
-                response_future.set_exception(SOCKET_CLOSED_ERROR)  # pragma: no cover
-
-        def _on_error(value):  # pragma: no cover
-            if not response_future.done():
-                response_future.set_exception(value)
+                response_future.set_exception(SOCKET_CLOSED_ERROR)
 
         self._json_stream \
             .filter(_response_filter) \
             .take(1) \
             .map(_to_response) \
             .subscribe(on_next=_on_next,
-                       on_completed=_on_completed,
-                       on_error=_on_error)
+                       on_completed=_on_completed)
 
     def _setup_progress_filter(self, response_future, request_id):
         task = asyncio.Task.current_task()
