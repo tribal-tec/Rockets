@@ -28,18 +28,18 @@ from nose.tools import assert_true, assert_false, assert_equal
 import rockets
 
 
-got_ping = asyncio.Future()
-hello_param = asyncio.Future()
+got_hello = asyncio.Future()
+echo_param = asyncio.Future()
 
 @methods.add
-async def ping():
-    global got_ping
-    got_ping.set_result(True)
+async def hello():
+    global got_hello
+    got_hello.set_result(True)
 
 @methods.add
-async def hello(name):
-    global hello_param
-    hello_param.set_result(name)
+async def echo(name):
+    global echo_param
+    echo_param.set_result(name)
 
 async def server_handle(websocket, path):
     request = await websocket.recv()
@@ -71,16 +71,16 @@ def test_reconnect():
 
 def test_no_param():
     client = rockets.Client(server_url)
-    client.notify('ping')
-    asyncio.get_event_loop().run_until_complete(got_ping)
-    assert_true(got_ping.result)
+    client.notify('hello')
+    asyncio.get_event_loop().run_until_complete(got_hello)
+    assert_true(got_hello.result())
 
 
 def test_param():
     client = rockets.Client(server_url)
-    client.notify('hello', {'name':'world'})
-    asyncio.get_event_loop().run_until_complete(hello_param)
-    assert_equal(hello_param.result(), 'world')
+    client.notify('echo', {'name':'world'})
+    asyncio.get_event_loop().run_until_complete(echo_param)
+    assert_equal(echo_param.result(), 'world')
 
 
 def test_method_not_found():
