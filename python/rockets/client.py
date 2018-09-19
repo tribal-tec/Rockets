@@ -259,8 +259,6 @@ class Client:
         except asyncio.CancelledError:
             for request_id in request_ids:
                 await self._async_notify('cancel', {'id': request_id})
-                # map(lambda request_id: self._async_notify('cancel', {'id': request_id}),
-                # request_ids)
 
     def _setup_response_filter(self, response_future, request_id):
         def _response_filter(value):

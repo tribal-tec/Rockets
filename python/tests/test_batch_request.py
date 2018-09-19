@@ -23,12 +23,14 @@
 import asyncio
 import websockets
 from jsonrpcserver.aio import methods
-from jsonrpcserver.response import RequestResponse
+from jsonrpcserver.response import BatchResponse, RequestResponse
 import json
 
 from nose.tools import assert_true, assert_equal, raises
 import rockets
 
+
+got_cancel = asyncio.Future()
 
 @methods.add
 async def ping():
@@ -43,9 +45,10 @@ async def server_handle(websocket, path):
 
     json_request = json.loads(request)
     if isinstance(json_request, list) and any(i['method'] == 'test_cancel' for i in json_request):
-        cancel_request = await websocket.recv()
-        print("GOT CANCEL", cancel_request)
-        response = RequestResponse(json_request['id'], 'CANCELLED')
+        got_cancel.set_result(True)
+        response = BatchResponse()
+        for i in json_request:
+            response.append(RequestResponse(i['id'], ['CANCELLED']))
     else:
         response = await methods.dispatch(request)
     if not response.is_notification:
@@ -86,14 +89,14 @@ def test_error_on_connection_lost():
 
 def test_cancel():
     client = rockets.Client(server_url)
-    request_task = client.async_batch_request(['test_cancel', 'test_cancel'], [[],[]])
+    request_task = client.async_batch_request(['test_cancel', 'test_cancel'], [[], []])
 
     def _on_done(value):
         assert_equal(value.result(), None)
         asyncio.get_event_loop().stop()
 
     async def _do_cancel():
-        asyncio.sleep(10)
+        await got_cancel
         request_task.cancel()
 
     request_task.add_done_callback(_on_done)
