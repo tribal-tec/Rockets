@@ -115,17 +115,24 @@ class Client:
         """
         return self._ws_observable
 
+    async def async_connect(self):
+        """Connect this client to the remote Rockets server"""
+        if self.connected():
+            return
+
+        self._ws = await websockets.connect(self._url, subprotocols=['rockets'], loop=self._loop)
+
     def connect(self):
         """Connect this client to the remote Rockets server"""
-        async def _connect():
-            await self._connect_ws()
-        self._loop.run_until_complete(_connect())
+        self._loop.run_until_complete(self.async_connect())
+
+    async def async_disconnect(self):
+        """Disconnect this client from the remote Rockets server."""
+        await self._ws.close()
 
     def disconnect(self):
         """Disconnect this client from the remote Rockets server."""
-        async def _disconnect():
-            await self._ws.close()
-        self._loop.run_until_complete(_disconnect())
+        self._loop.run_until_complete(self.async_disconnect())
 
     async def send(self, message):
         """
@@ -133,8 +140,22 @@ class Client:
 
         :param str message: The message to send
         """
-        await self._connect_ws()
+        await self.async_connect()
         await self._ws.send(message)
+
+    async def async_notify(self, method, params):
+        """
+        Invoke an RPC on the remote running Rockets instance without waiting for a response.
+
+        :param str method: name of the method to invoke
+        :param str params: params for the method
+        """
+        await self.async_connect()
+        if params:
+            notification = JSONRPC20Request(method, params, is_notification=True)
+        else:
+            notification = JSONRPC20Request(method, is_notification=True)
+        await self._ws.send(notification.json)
 
     def notify(self, method, params=None):
         """
@@ -143,7 +164,7 @@ class Client:
         :param str method: name of the method to invoke
         :param str params: params for the method
         """
-        self._loop.run_until_complete(self._async_notify(method, params))
+        self._loop.run_until_complete(self.async_notify(method, params))
 
     def async_request(self, method, params=None, response_timeout=None):
         """
@@ -215,18 +236,10 @@ class Client:
             observer.on_next(message)
         observer.on_completed()
 
-    async def _async_notify(self, method, params):
-        await self._connect_ws()
-        if params:
-            notification = JSONRPC20Request(method, params, is_notification=True)
-        else:
-            notification = JSONRPC20Request(method, is_notification=True)
-        await self._ws.send(notification.json)
-
     async def _async_request(self, method, params, response_timeout, loop):
         try:
             request_id = next(self._id_generator)
-            await self._connect_ws()
+            await self.async_connect()
             with async_timeout.timeout(response_timeout):
                 if params:
                     if not isinstance(params, (list, tuple, dict)):
@@ -244,12 +257,12 @@ class Client:
                 await response_future
                 return response_future.result()
         except asyncio.CancelledError:
-            await self._async_notify('cancel', {'id': request_id})
+            await self.async_notify('cancel', {'id': request_id})
 
     async def _async_batch_request(self, methods, params, response_timeout, loop):
         try:
             request_ids = list()
-            await self._connect_ws()
+            await self.async_connect()
             with async_timeout.timeout(response_timeout):
                 requests = list()
                 for method, param in zip(methods, params):
@@ -268,7 +281,7 @@ class Client:
                 return response_future.result()
         except asyncio.CancelledError:
             for request_id in request_ids:
-                await self._async_notify('cancel', {'id': request_id})
+                await self.async_notify('cancel', {'id': request_id})
 
     def _setup_response_filter(self, response_future, request_id):
         def _response_filter(value):
@@ -351,10 +364,3 @@ class Client:
                 progress_observable.dispose()
 
             response_future.add_done_callback(_done_callback)
-
-    async def _connect_ws(self):
-        """Internal: Connect websocket to self._url if not connected yet."""
-        if self.connected():
-            return
-
-        self._ws = await websockets.connect(self._url, subprotocols=['rockets'], loop=self._loop)
