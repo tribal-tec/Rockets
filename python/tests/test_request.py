@@ -116,8 +116,8 @@ def test_subsequent_request():
 
 
 def test_progress():
-    client = rockets.Client(server_url)
-    request_task = client.async_request('test_progress')
+    client = rockets.AsyncClient(server_url)
+    request_task = client.request('test_progress')
 
     class ProgressTracker:
         def on_progress(self, progress):
@@ -134,8 +134,8 @@ def test_progress():
 
 
 def test_cancel():
-    client = rockets.Client(server_url)
-    request_task = client.async_request('test_cancel')
+    client = rockets.AsyncClient(server_url)
+    request_task = client.request('test_cancel')
 
     def _on_done(value):
         assert_equal(value.result(), None)

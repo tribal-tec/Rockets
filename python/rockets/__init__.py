@@ -22,7 +22,11 @@
 
 """The Rockets python client implements JSONRPC to a Rockets server."""
 
-from .client import Client, RequestError, RequestProgress, RequestTask
+from .client import AsyncClient
+from .sync_client import Client
+from .request_error import RequestError
+from .request_progress import RequestProgress
+from .request_task import RequestTask
 from .version import VERSION as __version__
 
-__all__ = ['Client', 'RequestError', 'RequestProgress', 'RequestTask']
+__all__ = ['AsyncClient', 'Client', 'RequestError', 'RequestProgress', 'RequestTask']

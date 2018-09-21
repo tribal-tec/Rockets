@@ -42,10 +42,10 @@ def setup():
 
 
 def test_subscribe():
-    client = rockets.Client(server_url)
+    client = rockets.AsyncClient(server_url)
 
-    client.connect()
     async def _do_it():
+        await client.connect()
         received = asyncio.Future()
         def _on_message(message):
             assert_equal(message, 'Hello Rockets!')
