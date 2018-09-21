@@ -152,47 +152,16 @@ class AsyncClient:
             notification = JSONRPC20Request(method, is_notification=True)
         await self._ws.send(notification.json)
 
-    def request(self, method, params=None, response_timeout=None):
+    async def request(self, method, params, response_timeout):
         """
-        Invoke an RPC on the remote running Rockets instance and return the RequestTask.
+        Invoke an RPC on the remote running Rockets instance.
 
         :param str method: name of the method to invoke
         :param dict params: params for the method
         :param int response_timeout: number of seconds before requests gets cancelled.
-        :return: RequestTask object
-        :rtype: RequestTask
+        :return: future object
+        :rtype: future
         """
-        self._loop.set_task_factory(lambda loop, coro: RequestTask(coro=coro, loop=loop))
-
-        task = self._request(method, params, response_timeout, self._loop)
-        return asyncio.ensure_future(task, loop=self._loop)
-
-    def batch_request(self, methods, params, response_timeout=None):
-        """
-        Invoke a batch RPC on the remote running Rockets instance and return the RequestTask.
-
-        :param list methods: name of the methods to invoke
-        :param list params: params for the methods
-        :param int response_timeout: number of seconds to wait for the response
-        :return: RequestTask object
-        :rtype: RequestTask
-        :raises TypeError: if methods and/or params are not a list
-        """
-        if not isinstance(methods, list) and not isinstance(params, list):
-            raise TypeError('Not a list of methods')
-
-        self._loop.set_task_factory(lambda loop, coro: RequestTask(coro=coro, loop=loop))
-
-        task = self._batch_request(methods, params, response_timeout, self._loop)
-        return asyncio.ensure_future(task, loop=self._loop)
-
-    async def _ws_loop(self, observer):
-        """Internal: The loop for feeding an rxpy observer."""
-        async for message in self._ws:
-            observer.on_next(message)
-        observer.on_completed()
-
-    async def _request(self, method, params, response_timeout, loop):
         try:
             request_id = next(self._id_generator)
             await self._connect()
@@ -204,7 +173,7 @@ class AsyncClient:
                 else:
                     request = JSONRPC20Request(method, _id=request_id)
 
-                response_future = asyncio.Future(loop=loop)
+                response_future = asyncio.Future(loop=self._loop)
 
                 self._setup_response_filter(response_future, request_id)
                 self._setup_progress_filter(response_future, request_id)
@@ -215,7 +184,19 @@ class AsyncClient:
         except asyncio.CancelledError:
             await self.notify('cancel', {'id': request_id})
 
-    async def _batch_request(self, methods, params, response_timeout, loop):
+    async def batch_request(self, methods, params, response_timeout):
+        """
+        Invoke a batch RPC on the remote running Rockets instance.
+
+        :param list methods: name of the methods to invoke
+        :param list params: params for the methods
+        :param int response_timeout: number of seconds to wait for the response
+        :return: future object
+        :rtype: future
+        :raises TypeError: if methods and/or params are not a list
+        """
+        if not isinstance(methods, list) and not isinstance(params, list):
+            raise TypeError('Not a list of methods')
         try:
             request_ids = list()
             await self._connect()
@@ -228,7 +209,7 @@ class AsyncClient:
 
                 request = JSONRPC20Request.from_data(requests)
 
-                response_future = asyncio.Future(loop=loop)
+                response_future = asyncio.Future(loop=self._loop)
 
                 self._setup_batch_response_filter(response_future, request_ids)
 
@@ -238,6 +219,42 @@ class AsyncClient:
         except asyncio.CancelledError:
             for request_id in request_ids:
                 await self.notify('cancel', {'id': request_id})
+
+    def start_request(self, method, params=None, response_timeout=None):
+        """
+        Invoke an RPC on the remote running Rockets instance and return the RequestTask.
+
+        :param str method: name of the method to invoke
+        :param dict params: params for the method
+        :param int response_timeout: number of seconds before requests gets cancelled.
+        :return: RequestTask object
+        :rtype: RequestTask
+        """
+        self._loop.set_task_factory(lambda loop, coro: RequestTask(coro=coro, loop=loop))
+
+        task = self.request(method, params, response_timeout)
+        return asyncio.ensure_future(task, loop=self._loop)
+
+    def start_batch_request(self, methods, params, response_timeout=None):
+        """
+        Invoke a batch RPC on the remote running Rockets instance and return the RequestTask.
+
+        :param list methods: name of the methods to invoke
+        :param list params: params for the methods
+        :param int response_timeout: number of seconds to wait for the response
+        :return: RequestTask object
+        :rtype: RequestTask
+        """
+        self._loop.set_task_factory(lambda loop, coro: RequestTask(coro=coro, loop=loop))
+
+        task = self.batch_request(methods, params, response_timeout)
+        return asyncio.ensure_future(task, loop=self._loop)
+
+    async def _ws_loop(self, observer):
+        """Internal: The loop for feeding an rxpy observer."""
+        async for message in self._ws:
+            observer.on_next(message)
+        observer.on_completed()
 
     def _setup_response_filter(self, response_future, request_id):
         def _response_filter(value):

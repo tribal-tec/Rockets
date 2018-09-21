@@ -26,6 +26,9 @@ The Client manages a websocket connection to handle messaging with a remote Rock
 It runs in a thread and provides methods to send notifications and requests in JSON-RPC format.
 """
 
+import asyncio
+
+from threading import Thread
 from .client import AsyncClient
 
 
@@ -35,6 +38,29 @@ class Client(AsyncClient):
 
     It runs in a thread and provides methods to send notifications and requests in JSON-RPC format.
     """
+
+    def __init__(self, url, loop=None):
+        """
+        Bla
+
+        :param str url: The address of the remote running Rockets instance.
+        :param asyncio.AbstractEventLoop loop: Event loop where this client should run in
+        """
+        if not loop:
+            loop = asyncio.get_event_loop()
+        if loop.is_running():
+            loop = asyncio.new_event_loop()
+
+            def _start_background_loop(loop):
+                asyncio.set_event_loop(loop)
+                loop.run_forever()
+
+            self._thread = Thread(target=_start_background_loop, args=(loop,))
+            self._thread.start()
+        else:
+            self._thread = None
+
+        super().__init__(url, loop)
 
     def connect(self):
         """Connect this client to the remote Rockets server"""
@@ -64,9 +90,7 @@ class Client(AsyncClient):
         :rtype: dict
         :raises Exception: if request was not answered within given response_timeout
         """
-        task = super().request(method, params, response_timeout)
-        self._call_sync(task)
-        return task.result()
+        return self._call_sync(super().request(method, params, response_timeout))
 
     def batch_request(self, methods, params, response_timeout=5):
         """
@@ -79,11 +103,16 @@ class Client(AsyncClient):
         :rtype: list
         :raises Exception: if request was not answered within given response_timeout
         """
-        task = super().batch_request(methods, params, response_timeout)
-        self._call_sync(task)
-        return task.result()
+        return self._call_sync(super().batch_request(methods, params, response_timeout))
 
     def _call_sync(self, original_function):
-        if not self._loop.is_running():
+        if self._thread:
+            future = asyncio.run_coroutine_threadsafe(
+                original_function,
+                self._loop
+            )
+            return future.result()
+        elif not self._loop.is_running():
             return self._loop.run_until_complete(original_function)
-        raise Exception()
+        else:
+            raise Exception("Unknown working environment")
