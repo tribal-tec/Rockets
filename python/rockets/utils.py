@@ -39,7 +39,7 @@ def set_ws_protocol(url):
     if url.startswith(WS) or url.startswith(WSS):
         return url
     if url.startswith(HTTP):
-        return url.replace(HTTP, WS)
+        return url.replace(HTTP, WS, 1)
     if url.startswith(HTTPS):
-        return url.replace(HTTPS, WSS)
+        return url.replace(HTTPS, WSS, 1)
     return WS + url
