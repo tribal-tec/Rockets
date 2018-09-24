@@ -58,21 +58,8 @@ class Client:
                 loop.run_forever()
 
             self._thread = Thread(target=_start_background_loop, args=(loop,))
+            self._thread.daemon = True
             self._thread.start()
-
-            def _stop_loop():
-                #loop.call_soon_threadsafe(self._async_client.disconnect)
-                #asyncio.ensure_future(self._async_client.disconnect(), loop=loop)
-                #self._call_sync(self._async_client.disconnect())
-                #asyncio.run_coroutine_threadsafe(self._async_client.disconnect(), loop).result()
-
-                def _do_it():
-                    loop.call_soon_threadsafe(loop.stop)
-                Thread(target=_do_it).start()
-                #self._thread.join()
-                print("DELETED")
-
-            weakref.finalize(self, _stop_loop)
         else:
             self._thread = None
 
