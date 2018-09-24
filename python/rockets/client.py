@@ -108,18 +108,24 @@ class AsyncClient:
 
     def as_observable(self):
         """
-        Return the websocket stream as an rx observable to subscribe to it.
+        Returns the websocket stream as an rx observable to subscribe to it.
 
         :return: the websocket observable
         :rtype: rx.Observable
         """
         return self._ws_observable
 
+    def loop(self):
+        """
+        Returns the event loop for this client.
+
+        :return: event loop
+        :rtype: asyncio.AbstractEventLoop
+        """
+        return self._loop
+
     async def connect(self):
         """Connect this client to the remote Rockets server"""
-        await self._connect()
-
-    async def _connect(self):
         if self.connected():
             return
 
@@ -135,7 +141,7 @@ class AsyncClient:
 
         :param str message: The message to send
         """
-        await self._connect()
+        await self.connect()
         await self._ws.send(message)
 
     async def notify(self, method, params):
@@ -145,7 +151,7 @@ class AsyncClient:
         :param str method: name of the method to invoke
         :param str params: params for the method
         """
-        await self._connect()
+        await self.connect()
         if params:
             notification = JSONRPC20Request(method, params, is_notification=True)
         else:
@@ -164,7 +170,7 @@ class AsyncClient:
         """
         try:
             request_id = next(self._id_generator)
-            await self._connect()
+            await self.connect()
             with async_timeout.timeout(response_timeout):
                 if params:
                     if not isinstance(params, (list, tuple, dict)):
@@ -199,7 +205,7 @@ class AsyncClient:
             raise TypeError('Not a list of methods')
         try:
             request_ids = list()
-            await self._connect()
+            await self.connect()
             with async_timeout.timeout(response_timeout):
                 requests = list()
                 for method, param in zip(methods, params):

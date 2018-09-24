@@ -32,7 +32,7 @@ from threading import Thread
 from .client import AsyncClient
 
 
-class Client(AsyncClient):
+class Client:
     """
     The Client manages a websocket connection to handle messaging with a remote Rockets instance.
 
@@ -60,15 +60,33 @@ class Client(AsyncClient):
         else:
             self._thread = None
 
-        super().__init__(url, loop)
+        self._async_client = AsyncClient(url, loop)
+
+    def url(self):
+        """
+        Returns the address of the remote running Rockets instance.
+
+        :return: The address of the remote running Rockets instance.
+        :rtype: str
+        """
+        return self._async_client.url()
+
+    def connected(self):
+        """
+        Returns the connection state of this client.
+
+        :return: true if the websocket is connected to the remote Rockets instance.
+        :rtype: bool
+        """
+        return self._async_client.connected()
 
     def connect(self):
         """Connect this client to the remote Rockets server"""
-        self._call_sync(super().connect())
+        self._call_sync(self._async_client.connect())
 
     def disconnect(self):
         """Disconnect this client from the remote Rockets server."""
-        self._call_sync(super().disconnect())
+        self._call_sync(self._async_client.disconnect())
 
     def notify(self, method, params=None):
         """
@@ -77,7 +95,7 @@ class Client(AsyncClient):
         :param str method: name of the method to invoke
         :param str params: params for the method
         """
-        self._call_sync(super().notify(method, params))
+        self._call_sync(self._async_client.notify(method, params))
 
     def request(self, method, params=None, response_timeout=5):
         """
@@ -90,7 +108,7 @@ class Client(AsyncClient):
         :rtype: dict
         :raises Exception: if request was not answered within given response_timeout
         """
-        return self._call_sync(super().request(method, params, response_timeout))
+        return self._call_sync(self._async_client.request(method, params, response_timeout))
 
     def batch_request(self, methods, params, response_timeout=5):
         """
@@ -103,16 +121,16 @@ class Client(AsyncClient):
         :rtype: list
         :raises Exception: if request was not answered within given response_timeout
         """
-        return self._call_sync(super().batch_request(methods, params, response_timeout))
+        return self._call_sync(self._async_client.batch_request(methods, params, response_timeout))
 
     def _call_sync(self, original_function):
         if self._thread:
             future = asyncio.run_coroutine_threadsafe(
                 original_function,
-                self._loop
+                self._async_client.loop()
             )
             return future.result()
-        elif not self._loop.is_running():
-            return self._loop.run_until_complete(original_function)
+        elif not self._async_client.loop().is_running():
+            return self._async_client.loop().run_until_complete(original_function)
         else:
             raise Exception("Unknown working environment")
