@@ -133,6 +133,9 @@ class AsyncClient:
 
     async def disconnect(self):
         """Disconnect this client from the remote Rockets server."""
+        if not self.connected():
+            return
+
         await self._ws.close()
 
     async def send(self, message):

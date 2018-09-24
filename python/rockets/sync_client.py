@@ -27,6 +27,7 @@ It runs in a thread and provides methods to send notifications and requests in J
 """
 
 import asyncio
+import weakref
 
 from threading import Thread
 from .client import AsyncClient
@@ -48,6 +49,7 @@ class Client:
         """
         if not loop:
             loop = asyncio.get_event_loop()
+
         if loop.is_running():
             loop = asyncio.new_event_loop()
 
@@ -57,6 +59,20 @@ class Client:
 
             self._thread = Thread(target=_start_background_loop, args=(loop,))
             self._thread.start()
+
+            def _stop_loop():
+                #loop.call_soon_threadsafe(self._async_client.disconnect)
+                #asyncio.ensure_future(self._async_client.disconnect(), loop=loop)
+                #self._call_sync(self._async_client.disconnect())
+                #asyncio.run_coroutine_threadsafe(self._async_client.disconnect(), loop).result()
+
+                def _do_it():
+                    loop.call_soon_threadsafe(loop.stop)
+                Thread(target=_do_it).start()
+                #self._thread.join()
+                print("DELETED")
+
+            weakref.finalize(self, _stop_loop)
         else:
             self._thread = None
 
