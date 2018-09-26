@@ -73,6 +73,12 @@ def test_invalid_args():
     client.batch_request('foo', 'bar')
 
 
+@raises(ValueError)
+def test_empty_request():
+    client = rockets.Client(server_url)
+    client.batch_request([], [])
+
+
 def test_method_not_found():
     client = rockets.Client(server_url)
     assert_equal(client.batch_request(['foo'], [['bar']]),

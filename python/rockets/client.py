@@ -206,6 +206,9 @@ class AsyncClient:
         """
         if not isinstance(methods, list) and not isinstance(params, list):
             raise TypeError('Not a list of methods')
+
+        if not methods:
+            raise ValueError("Empty batch request not allowed")
         try:
             request_ids = list()
             await self.connect()
