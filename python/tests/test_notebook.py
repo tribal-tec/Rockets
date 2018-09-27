@@ -24,71 +24,86 @@ import asyncio
 import websockets
 from jsonrpcserver.aio import methods
 
-from threading import Thread
-from nose.tools import assert_true, assert_false, assert_equal
+from threading import Thread, Event
+from nose.tools import assert_true, assert_false, assert_equal, raises
 import rockets
 
-
-got_hello = asyncio.Future()
+got_message = None
 
 @methods.add
 async def hello():
-    global got_hello
-    got_hello.set_result(True)
+    pass
+
+@methods.add
+async def ping():
+    return 'pong'
 
 async def server_handle(websocket, path):
-    print("HELLO?")
     request = await websocket.recv()
-    await methods.dispatch(request)
-
-server_url = None
-def setup():
-    # server_loop = asyncio.new_event_loop()
-
-    # def _start_background_loop(loop):
-    #     asyncio.set_event_loop(loop)
-    #     loop.run_forever()
-
-    # server_thread = Thread(target=_start_background_loop, args=(server_loop,))
-    # server_thread.start()
-
-    start_server = websockets.serve(server_handle, 'localhost')
-    #server = asyncio.ensure_future(start_server, loop=server_loop)
-    #future = asyncio.run_coroutine_threadsafe(start_server, server_loop)
-    #server = future.result()
-    server = asyncio.get_event_loop().run_until_complete(start_server)
-    global server_url
-    server_url = 'localhost:'+str(server.sockets[0].getsockname()[1])
+    response = await methods.dispatch(request)
+    if not response.is_notification:
+        await websocket.send(str(response))
+    global got_message
+    got_message.set_result(True)
 
 
-def test_run_in_loop():
-    client_loop = asyncio.get_event_loop()#asyncio.new_event_loop()
+class TestClass():
+    def _run_server(self):
+        asyncio.set_event_loop(self.server_loop)
+        start_server = websockets.serve(server_handle, 'localhost')
+        server = self.server_loop.run_until_complete(start_server)
 
-    # def _start_background_loop(loop):
-    #     asyncio.set_event_loop(loop)
-    #     loop.run_forever()
+        self.server_url = 'localhost:'+str(server.sockets[0].getsockname()[1])
+        self.server_ready.set()
 
-    # client_thread = Thread(target=_start_background_loop, args=(client_loop,))
-    # client_thread.daemon = True
-    # client_thread.start()
+        self.got_message = self.server_loop.create_future()
+        global got_message
+        got_message = self.got_message
+        self.server_loop.run_until_complete(self.got_message)
 
-    async def runner():
-        client = rockets.Client('ws://'+server_url,loop=client_loop)
-        #client = rockets.Client('ws://localhost:8200',loop=client_loop)
-        #assert_equal(client.url(), 'ws://'+server_url)
-        assert_false(client.connected())
-        print("DONE")
+    def setup(self):
+        self.server_ready = Event()
+        self.server_loop = asyncio.new_event_loop()
+        self.server_thread = Thread(target=self._run_server)
+        self.server_thread.start()
+
+    def teardown(self):
+        self.server_thread.join()
+
+    def test_notify(self):
+        async def run_notebook_cell():
+            self.server_ready.wait()
+            client = rockets.Client('ws://'+self.server_url)
+            client.notify('hello')
+
+        asyncio.get_event_loop().run_until_complete(run_notebook_cell())
+
+    def test_request(self):
+        async def run_notebook_cell():
+            self.server_ready.wait()
+            client = rockets.Client('ws://'+self.server_url)
+            assert_equal(client.request('ping'), 'pong')
+
+        asyncio.get_event_loop().run_until_complete(run_notebook_cell())
+
+    def test_invalid_environment(self):
+        self.server_ready.wait()
+        client = rockets.Client('ws://'+self.server_url)
+
+        async def run_notebook_cell(client):
+            try:
+                client.request('ping')
+                return False
+            except RuntimeError:
+                return True
+
+        called = asyncio.get_event_loop().run_until_complete(run_notebook_cell(client))
+        assert_true(called)
+
+        # unblock server thread
         client.notify('hello')
-        print("DONE")
-        await got_hello
-        print("DONE")
-
-    #asyncio.run_coroutine_threadsafe(runner(), client_loop).result()
-    asyncio.get_event_loop().run_until_complete(runner())
 
 
 if __name__ == '__main__':
-    #import nose
-    #nose.run(defaultTest=__name__)
-    setup()
-    test_run_in_loop()
+    import nose
+    nose.run(defaultTest=__name__)

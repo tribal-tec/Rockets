@@ -27,7 +27,6 @@ It runs in a thread and provides methods to send notifications and requests in J
 """
 
 import asyncio
-import weakref
 
 from threading import Thread
 from .client import AsyncClient
@@ -136,4 +135,4 @@ class Client:
         elif not self._async_client.loop().is_running():
             return self._async_client.loop().run_until_complete(original_function)
         else:
-            raise Exception("Unknown working environment")
+            raise RuntimeError("Unknown working environment")

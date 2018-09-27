@@ -203,6 +203,7 @@ class AsyncClient:
         :return: future object
         :rtype: future
         :raises TypeError: if methods and/or params are not a list
+        :raises ValueError: if methods are empty
         """
         if not isinstance(methods, list) and not isinstance(params, list):
             raise TypeError('Not a list of methods')
@@ -264,9 +265,13 @@ class AsyncClient:
 
     async def _ws_loop(self, observer):
         """Internal: The loop for feeding an rxpy observer."""
-        async for message in self._ws:
-            observer.on_next(message)
-        observer.on_completed()
+        try:
+            async for message in self._ws:
+                observer.on_next(message)
+            observer.on_completed()
+        except websockets.ConnectionClosed as e:  # pragma: no cover
+            print(e)
+            observer.on_completed()
 
     def _setup_response_filter(self, response_future, request_id):
         def _response_filter(value):

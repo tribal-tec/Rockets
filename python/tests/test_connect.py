@@ -78,6 +78,16 @@ def test_reconnect():
     assert_true(client.connected())
 
 
+def test_double_disconnect():
+    client = rockets.Client(server_url)
+    client.connect()
+    assert_true(client.connected())
+    client.disconnect()
+    assert_false(client.connected())
+    client.disconnect()
+    assert_false(client.connected())
+
+
 if __name__ == '__main__':
     import nose
     nose.run(defaultTest=__name__)
