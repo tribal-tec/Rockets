@@ -38,6 +38,10 @@ async def hello():
 async def ping():
     return 'pong'
 
+@methods.add
+async def double(value):
+    return value*2
+
 async def server_handle(websocket, path):
     request = await websocket.recv()
     response = await methods.dispatch(request)
@@ -104,8 +108,9 @@ class TestClass():
         client.notify('hello')
 
     def test_async_request(self):
-        def _on_done(result):
-            assert_equal(result, 'png')
+        called = asyncio.get_event_loop().create_future()
+        def _on_done(the_task):
+            called.set_result(the_task.result())
 
         async def run_notebook_cell():
             self.server_ready.wait()
@@ -115,6 +120,22 @@ class TestClass():
             await task
 
         asyncio.get_event_loop().run_until_complete(run_notebook_cell())
+        assert_equal(asyncio.get_event_loop().run_until_complete(called), 'pong')
+
+    def test_async_batch_request(self):
+        called = asyncio.get_event_loop().create_future()
+        def _on_done(the_task):
+            called.set_result(the_task.result())
+
+        async def run_notebook_cell():
+            self.server_ready.wait()
+            client = rockets.Client('ws://'+self.server_url)
+            task = client.start_batch_request(['double', 'double'], [[2], [4]])
+            task.add_done_callback(_on_done)
+            await task
+
+        asyncio.get_event_loop().run_until_complete(run_notebook_cell())
+        assert_equal(asyncio.get_event_loop().run_until_complete(called), [4, 8])
 
 
 if __name__ == '__main__':
