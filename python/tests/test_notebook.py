@@ -115,7 +115,7 @@ class TestClass():
         async def run_notebook_cell():
             self.server_ready.wait()
             client = rockets.Client('ws://'+self.server_url)
-            task = client.start_request('ping')
+            task = client.async_request('ping')
             task.add_done_callback(_on_done)
             await task
 
@@ -130,7 +130,7 @@ class TestClass():
         async def run_notebook_cell():
             self.server_ready.wait()
             client = rockets.Client('ws://'+self.server_url)
-            task = client.start_batch_request(['double', 'double'], [[2], [4]])
+            task = client.async_batch_request(['double', 'double'], [[2], [4]])
             task.add_done_callback(_on_done)
             await task
 

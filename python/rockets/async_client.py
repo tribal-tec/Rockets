@@ -233,7 +233,7 @@ class AsyncClient:
             for request_id in request_ids:
                 await self.notify('cancel', {'id': request_id})
 
-    def start_request(self, method, params=None, response_timeout=None):
+    def async_request(self, method, params=None, response_timeout=None):
         """
         Invoke an RPC on the remote running Rockets instance and return the RequestTask.
 
@@ -248,7 +248,7 @@ class AsyncClient:
         task = self.request(method, params, response_timeout)
         return asyncio.ensure_future(task, loop=self._loop)
 
-    def start_batch_request(self, methods, params, response_timeout=None):
+    def async_batch_request(self, methods, params, response_timeout=None):
         """
         Invoke a batch RPC on the remote running Rockets instance and return the RequestTask.
 

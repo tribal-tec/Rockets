@@ -133,7 +133,7 @@ class Client:
         self._verify_environment()
         return self._call_sync(self._client.batch_request(methods, params, response_timeout))
 
-    def start_request(self, method, params=None, response_timeout=None):
+    def async_request(self, method, params=None, response_timeout=None):
         """
         Invoke an RPC on the remote running Rockets instance and return the RequestTask.
 
@@ -143,9 +143,9 @@ class Client:
         :return: RequestTask object
         :rtype: RequestTask
         """
-        return self._async_client.start_request(method, params, response_timeout)
+        return self._async_client.async_request(method, params, response_timeout)
 
-    def start_batch_request(self, methods, params, response_timeout=None):
+    def async_batch_request(self, methods, params, response_timeout=None):
         """
         Invoke a batch RPC on the remote running Rockets instance and return the RequestTask.
 
@@ -155,7 +155,7 @@ class Client:
         :return: RequestTask object
         :rtype: RequestTask
         """
-        return self._async_client.start_batch_request(methods, params, response_timeout)
+        return self._async_client.async_batch_request(methods, params, response_timeout)
 
     def _verify_environment(self):
         if not self._thread and self._client.loop().is_running():

@@ -95,7 +95,7 @@ def test_error_on_connection_lost():
 
 def test_cancel():
     client = rockets.AsyncClient(server_url)
-    request_task = client.start_batch_request(['test_cancel', 'test_cancel'], [[], []])
+    request_task = client.async_batch_request(['test_cancel', 'test_cancel'], [[], []])
 
     def _on_done(value):
         assert_equal(value.result(), None)
