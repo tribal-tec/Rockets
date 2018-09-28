@@ -154,12 +154,11 @@ class AsyncClient:
         :param str method: name of the method to invoke
         :param str params: params for the method
         """
-        await self.connect()
         if params:
             notification = JSONRPC20Request(method, params, is_notification=True)
         else:
             notification = JSONRPC20Request(method, is_notification=True)
-        await self._ws.send(notification.json)
+        await self.send(notification.json)
 
     async def request(self, method, params=None, response_timeout=5):
         """
@@ -173,7 +172,6 @@ class AsyncClient:
         """
         try:
             request_id = next(self._id_generator)
-            await self.connect()
             with async_timeout.timeout(response_timeout):
                 if params:
                     if not isinstance(params, (list, tuple, dict)):
@@ -184,10 +182,11 @@ class AsyncClient:
 
                 response_future = self._loop.create_future()
 
+                await self.connect()
                 self._setup_response_filter(response_future, request_id)
                 self._setup_progress_filter(response_future, request_id)
 
-                await self._ws.send(request.json)
+                await self.send(request.json)
                 await response_future
                 return response_future.result()
         except asyncio.CancelledError:
@@ -212,7 +211,6 @@ class AsyncClient:
             raise ValueError("Empty batch request not allowed")
         try:
             request_ids = list()
-            await self.connect()
             with async_timeout.timeout(response_timeout):
                 requests = list()
                 for method, param in zip(methods, params):
@@ -224,9 +222,10 @@ class AsyncClient:
 
                 response_future = self._loop.create_future()
 
+                await self.connect()
                 self._setup_batch_response_filter(response_future, request_ids)
 
-                await self._ws.send(request.json)
+                await self.send(request.json)
                 await response_future
                 return response_future.result()
         except asyncio.CancelledError:

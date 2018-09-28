@@ -44,18 +44,18 @@ def setup():
 def test_subscribe():
     client = rockets.AsyncClient(server_url)
 
+    received = asyncio.get_event_loop().create_future()
     async def _do_it():
         await client.connect()
-        received = asyncio.Future()
         def _on_message(message):
-            assert_equal(message, 'Hello Rockets!')
-            received.set_result(True)
+            received.set_result(message)
 
         client.as_observable().subscribe(_on_message)
         await client.send("Rockets")
         await received
 
     asyncio.get_event_loop().run_until_complete(_do_it())
+    assert_equal(received.result(), 'Hello Rockets!')
 
 
 if __name__ == '__main__':
