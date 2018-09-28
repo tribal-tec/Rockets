@@ -182,7 +182,7 @@ class AsyncClient:
                 else:
                     request = JSONRPC20Request(method, _id=request_id)
 
-                response_future = asyncio.Future(loop=self._loop)
+                response_future = self._loop.create_future()
 
                 self._setup_response_filter(response_future, request_id)
                 self._setup_progress_filter(response_future, request_id)
@@ -222,7 +222,7 @@ class AsyncClient:
 
                 request = JSONRPC20Request.from_data(requests)
 
-                response_future = asyncio.Future(loop=self._loop)
+                response_future = self._loop.create_future()
 
                 self._setup_batch_response_filter(response_future, request_ids)
 

@@ -84,10 +84,12 @@ class Client:
 
     def connect(self):
         """Connect this client to the remote Rockets server"""
+        self._verify_environment()
         self._call_sync(self._async_client.connect())
 
     def disconnect(self):
         """Disconnect this client from the remote Rockets server."""
+        self._verify_environment()
         self._call_sync(self._async_client.disconnect())
 
     def notify(self, method, params=None):
@@ -97,6 +99,7 @@ class Client:
         :param str method: name of the method to invoke
         :param str params: params for the method
         """
+        self._verify_environment()
         self._call_sync(self._async_client.notify(method, params))
 
     def request(self, method, params=None, response_timeout=5):
@@ -110,6 +113,7 @@ class Client:
         :rtype: dict
         :raises Exception: if request was not answered within given response_timeout
         """
+        self._verify_environment()
         return self._call_sync(self._async_client.request(method, params, response_timeout))
 
     def batch_request(self, methods, params, response_timeout=5):
@@ -123,6 +127,7 @@ class Client:
         :rtype: list
         :raises Exception: if request was not answered within given response_timeout
         """
+        self._verify_environment()
         return self._call_sync(self._async_client.batch_request(methods, params, response_timeout))
 
     def start_request(self, method, params=None, response_timeout=None):
@@ -147,7 +152,16 @@ class Client:
         :return: RequestTask object
         :rtype: RequestTask
         """
-        return self._async_client.start_batch_request(methods, params, response_timeout)
+        task = self._async_client.start_batch_request(methods, params, response_timeout)
+        if self._thread:
+            async def dummy():
+                pass
+            asyncio.run_coroutine_threadsafe(dummy(), self._async_client.loop()).result()
+        return task
+
+    def _verify_environment(self):
+        if not self._thread and self._async_client.loop().is_running():
+            raise RuntimeError("Unknown working environment")
 
     def _call_sync(self, original_function):
         if self._thread:
@@ -156,7 +170,4 @@ class Client:
                 self._async_client.loop()
             )
             return future.result()
-        elif not self._async_client.loop().is_running():
-            return self._async_client.loop().run_until_complete(original_function)
-        else:
-            raise RuntimeError("Unknown working environment")
+        return self._async_client.loop().run_until_complete(original_function)
