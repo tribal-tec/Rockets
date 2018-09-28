@@ -30,6 +30,7 @@ import asyncio
 
 from threading import Thread
 from .async_client import AsyncClient
+from .request_task import RequestTask
 
 
 class Client:
@@ -140,7 +141,60 @@ class Client:
         :return: RequestTask object
         :rtype: RequestTask
         """
-        return self._async_client.start_request(method, params, response_timeout)
+        # if self._thread:
+        #     #self._async_client.loop().set_task_factory(lambda loop, coro: RequestTask(coro=coro, loop=loop))
+        #     #task = self._async_client.loop().call_soon_threadsafe(self._async_client.request, method, params, response_timeout)
+        #     #return task
+        #     #return self._async_client.loop().call_soon_threadsafe(self._async_client.start_request, method, params, response_timeout)
+        #     self._async_client.loop().set_task_factory(lambda loop, coro: RequestTask(coro=coro, loop=loop))
+        #     #future = asyncio.run_coroutine_threadsafe(
+        #     #    self._async_client.request(method, params, response_timeout),
+        #     #    self._async_client.loop()
+        #     #)
+        #     #return asyncio.ensure_future(future)
+
+        #     def target(loop, timeout=None):
+                 future = asyncio.run_coroutine_threadsafe(self._async_client.request(method, params, response_timeout), self._async_client.loop())
+        #         return future.result()
+
+        #     return asyncio.get_event_loop().run_in_executor(None, target, asyncio.get_event_loop())
+
+        task = self._async_client.start_request(method, params, response_timeout)
+        if self._thread:
+            new_code = False
+            if new_code:
+                async def dummy():
+                    pass
+                asyncio.run_coroutine_threadsafe(dummy(), self._async_client.loop()).result()
+                return task
+
+            asyncio.get_event_loop().set_task_factory(lambda loop, coro: RequestTask(coro=coro, loop=loop))
+
+            async def coro():
+                try:
+                    #from threading import Event
+                    #evt = Event()
+                    #print("HERE!!!")
+                    #await asyncio.sleep(1)
+                    print("HERE!!!")
+                    fut = asyncio.get_event_loop().create_future()
+                    def _on_done(the_task):
+                        print("DONE!!!")
+                        #evt.set()
+                        fut.set_result(the_task.result())
+                    task.add_done_callback(_on_done)
+                    #evt.wait()
+
+                    await fut
+                    return fut.result()
+                except asyncio.CancelledError:
+                    task.cancel()
+
+            wrapper_task = asyncio.get_event_loop().create_task(coro())
+            asyncio.ensure_future(wrapper_task, loop=asyncio.get_event_loop())
+            return wrapper_task
+        return task
+
 
     def start_batch_request(self, methods, params, response_timeout=None):
         """
