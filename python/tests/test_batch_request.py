@@ -21,10 +21,10 @@
 # All rights reserved. Do not distribute without further notice.
 
 import asyncio
+import json
 import websockets
 from jsonrpcserver.aio import methods
 from jsonrpcserver.response import BatchResponse, RequestResponse
-import json
 
 from nose.tools import assert_true, assert_equal, raises
 import rockets
@@ -88,9 +88,9 @@ def test_method_not_found():
 @raises(rockets.request_error.RequestError)
 def test_error_on_connection_lost():
     client = rockets.Client(server_url)
-    # do one request, which finishes the server, so the second request will throw an error
+    # do one request, which closes the server, so the second request will throw an error
     assert_equal(client.request('ping'), 'pong')
-    assert_equal(client.batch_request(['double', 'double'], [[2], [4]]), [4, 8])
+    client.batch_request(['double', 'double'], [[2], [4]])
 
 
 def test_cancel():

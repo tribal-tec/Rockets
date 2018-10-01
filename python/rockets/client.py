@@ -117,7 +117,7 @@ class Client:
         :raises Exception: if request was not answered within given response_timeout
         """
         self._verify_environment()
-        return self._call_sync(self._client.request(method, params, response_timeout))
+        return self._call_sync(self._client.request(method, params), response_timeout)
 
     def batch_request(self, methods, params, response_timeout=5):
         """
@@ -131,41 +131,39 @@ class Client:
         :raises Exception: if request was not answered within given response_timeout
         """
         self._verify_environment()
-        return self._call_sync(self._client.batch_request(methods, params, response_timeout))
+        return self._call_sync(self._client.batch_request(methods, params), response_timeout)
 
-    def async_request(self, method, params=None, response_timeout=None):
+    def async_request(self, method, params=None):
         """
         Invoke an RPC on the remote running Rockets instance and return the RequestTask.
 
         :param str method: name of the method to invoke
         :param dict params: params for the method
-        :param int response_timeout: number of seconds before requests gets cancelled.
         :return: RequestTask object
         :rtype: RequestTask
         """
-        return self._async_client.async_request(method, params, response_timeout)
+        return self._async_client.async_request(method, params)
 
-    def async_batch_request(self, methods, params, response_timeout=None):
+    def async_batch_request(self, methods, params):
         """
         Invoke a batch RPC on the remote running Rockets instance and return the RequestTask.
 
         :param list methods: name of the methods to invoke
         :param list params: params for the methods
-        :param int response_timeout: number of seconds to wait for the response
         :return: RequestTask object
         :rtype: RequestTask
         """
-        return self._async_client.async_batch_request(methods, params, response_timeout)
+        return self._async_client.async_batch_request(methods, params)
 
     def _verify_environment(self):
         if not self._thread and self._client.loop().is_running():
             raise RuntimeError("Unknown working environment")
 
-    def _call_sync(self, original_function):
+    def _call_sync(self, original_function, response_timeout=None):
         if self._thread:
             future = asyncio.run_coroutine_threadsafe(
                 original_function,
                 self._client.loop()
             )
-            return future.result()
+            return future.result(response_timeout)
         return self._client.loop().run_until_complete(original_function)

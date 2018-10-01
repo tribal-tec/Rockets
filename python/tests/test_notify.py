@@ -70,6 +70,7 @@ def test_param():
 def test_method_not_found():
     client = rockets.Client(server_url)
     client.notify('pong')
+    # no effect on the client side
 
 if __name__ == '__main__':
     import nose
