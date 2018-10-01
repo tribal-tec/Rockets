@@ -20,30 +20,26 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 # All rights reserved. Do not distribute without further notice.
 
-"""
-The Client manages a websocket connection to handle messaging with a remote Rockets instance.
-
-It runs in a thread and provides methods to send notifications and requests in JSON-RPC format.
-"""
+"""Client that support synchronous and asynchronous usage of the :class:`AsyncClient`."""
 
 import asyncio
 
 from threading import Thread
 from .async_client import AsyncClient
+from .utils import copydoc
 
 
 class Client:
-    """
-    The Client manages a websocket connection to handle messaging with a remote Rockets instance.
-
-    It runs in a thread and provides methods to send notifications and requests in JSON-RPC format.
-    """
+    """Client that support synchronous and asynchronous usage of the :class:`AsyncClient`."""
 
     def __init__(self, url, subprotocols=None, loop=None):
         """
-        Bla
+        Setup the :class:`AsyncClient` for synchronous usage.
 
-        :param str url: The address of the remote running Rockets instance.
+        In case the given loop is running, uses a second threaded client to achieve synchronous
+        execution.
+
+        :param str url: The address of the Rockets server.
         :param list subprotocols: The websocket protocols to use
         :param asyncio.AbstractEventLoop loop: Event loop where this client should run in
         """
@@ -68,90 +64,62 @@ class Client:
             self._client = AsyncClient(url, subprotocols=subprotocols, loop=loop)
             self._async_client = self._client
 
-    def url(self):
-        """
-        Returns the address of the remote running Rockets instance.
-
-        :return: The address of the remote running Rockets instance.
-        :rtype: str
-        """
+    @copydoc(AsyncClient.url)
+    def url(self):  # noqa: D102 pylint: disable=missing-docstring
         return self._client.url()
 
-    def connected(self):
-        """
-        Returns the connection state of this client.
-
-        :return: true if the websocket is connected to the remote Rockets instance.
-        :rtype: bool
-        """
+    @copydoc(AsyncClient.connected)
+    def connected(self):  # noqa: D102 pylint: disable=missing-docstring
         return self._client.connected()
 
-    def connect(self):
-        """Connect this client to the remote Rockets server"""
+    @copydoc(AsyncClient.connect)
+    def connect(self):  # noqa: D102 pylint: disable=missing-docstring
         self._verify_environment()
         self._call_sync(self._client.connect())
 
-    def disconnect(self):
-        """Disconnect this client from the remote Rockets server."""
+    @copydoc(AsyncClient.disconnect)
+    def disconnect(self):  # noqa: D102 pylint: disable=missing-docstring
         self._verify_environment()
         self._call_sync(self._client.disconnect())
 
-    def notify(self, method, params=None):
-        """
-        Invoke an RPC on the remote running Rockets instance without waiting for a response.
+    @copydoc(AsyncClient.as_observable)
+    def as_observable(self):  # noqa: D102 pylint: disable=missing-docstring
+        return self._client.as_observable()
 
-        :param str method: name of the method to invoke
-        :param str params: params for the method
-        """
+    @copydoc(AsyncClient.send)
+    def send(self, message):  # noqa: D102 pylint: disable=missing-docstring
+        self._verify_environment()
+        self._call_sync(self._client.send(message))
+
+    @copydoc(AsyncClient.notify)
+    def notify(self, method, params=None):  # noqa: D102 pylint: disable=missing-docstring
         self._verify_environment()
         self._call_sync(self._client.notify(method, params))
 
-    def request(self, method, params=None, response_timeout=5):
+    @copydoc(AsyncClient.request)
+    def request(self, method, params=None, response_timeout=None):  # noqa: D102,D205 pylint: disable=C0111,W9011,W9012,W9015,W9016
         """
-        Invoke an RPC on the remote running Rockets instance and wait for its reponse.
-
-        :param str method: name of the method to invoke
-        :param dict params: params for the method
         :param int response_timeout: number of seconds to wait for the response
-        :return: result or error of RPC
-        :rtype: dict
-        :raises Exception: if request was not answered within given response_timeout
+        :raises TimeoutError: if request was not answered within given response_timeout
         """
         self._verify_environment()
         return self._call_sync(self._client.request(method, params), response_timeout)
 
-    def batch_request(self, requests, response_timeout=5):
+    @copydoc(AsyncClient.batch_request)
+    def batch_request(self, requests, response_timeout=None):  # noqa: D102,D205 pylint: disable=C0111,W9011,W9012,W9015,W9016
         """
-        Invoke a batch RPC on the remote running Rockets instance and wait for its reponse.
-
-        :param list requests: list of requests and/or notifications to send as batch
         :param int response_timeout: number of seconds to wait for the response
-        :return: list of responses and/or errors of RPC
-        :rtype: list
-        :raises Exception: if request was not answered within given response_timeout
+        :raises TimeoutError: if request was not answered within given response_timeout
         """
         self._verify_environment()
         return self._call_sync(self._client.batch_request(requests), response_timeout)
 
-    def async_request(self, method, params=None):
-        """
-        Invoke an RPC on the remote running Rockets instance and return the RequestTask.
-
-        :param str method: name of the method to invoke
-        :param dict params: params for the method
-        :return: RequestTask object
-        :rtype: RequestTask
-        """
+    @copydoc(AsyncClient.async_request)
+    def async_request(self, method, params=None):  # noqa: D102 pylint: disable=missing-docstring
         return self._async_client.async_request(method, params)
 
-    def async_batch_request(self, requests):
-        """
-        Invoke a batch RPC on the remote running Rockets instance and return the RequestTask.
-
-        :param list requests: list of requests and/or notifications to send as batch
-        :return: RequestTask object
-        :rtype: RequestTask
-        """
+    @copydoc(AsyncClient.async_batch_request)
+    def async_batch_request(self, requests):  # noqa: D102 pylint: disable=missing-docstring
         return self._async_client.async_batch_request(requests)
 
     def _verify_environment(self):

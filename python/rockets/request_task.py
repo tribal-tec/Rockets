@@ -36,7 +36,7 @@ class RequestTask(asyncio.Task):
         """
         Add a callback to be run everytime a progress update arrives.
 
-        The callback is called with a single argument - the RequestProgress object.
+        The callback is called with a single argument - the :class:`RequestProgress` object.
         """
         self._progress_callbacks.append(fn)
 

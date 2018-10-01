@@ -20,7 +20,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 # All rights reserved. Do not distribute without further notice.
 
-"""The Rockets python client implements JSONRPC to a Rockets server."""
+"""A small client for Rockets using JSON-RPC as communication contract over a WebSocket."""
 
 from .async_client import AsyncClient
 from .client import Client

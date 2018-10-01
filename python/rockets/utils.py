@@ -22,6 +22,9 @@
 
 """Utils for the client"""
 
+from random import choice
+from string import ascii_lowercase, digits
+
 HTTP = 'http://'
 HTTPS = 'https://'
 WS = 'ws://'
@@ -43,3 +46,36 @@ def set_ws_protocol(url):
     if url.startswith(HTTPS):
         return url.replace(HTTPS, WSS, 1)
     return WS + url
+
+
+def copydoc(fromfunc, sep="\n"):
+    """
+    Decorator: Copy the docstring of `fromfunc`
+
+    :return:
+    :rtype:
+    """
+    def _decorator(func):
+        sourcedoc = fromfunc.__doc__
+        if func.__doc__:  # pragma: no cover
+            func.__doc__ = sep.join([sourcedoc, func.__doc__])
+        else:
+            func.__doc__ = sourcedoc
+        return func
+    return _decorator
+
+
+def random_string(length=8, chars=digits + ascii_lowercase):
+    """
+    A random string.
+
+    Not unique, but has around 1 in a million chance of collision (with the default 8
+    character length). e.g. 'fubui5e6'
+
+    :param int length: Length of the random string.
+    :param str chars: The characters to randomly choose from.
+    :return: random string
+    :rtype: str
+    """
+    while True:
+        yield "".join([choice(chars) for _ in range(length)])

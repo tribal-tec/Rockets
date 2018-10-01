@@ -20,11 +20,7 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 # All rights reserved. Do not distribute without further notice.
 
-"""
-The Client manages a websocket connection to handle messaging with a remote Rockets instance.
-
-It runs in a thread and provides methods to send notifications and requests in JSON-RPC format.
-"""
+"""Asynchronous client implementation for asyncio event loop processing of JSON-RPC messages."""
 
 import asyncio
 import json
@@ -42,21 +38,16 @@ from .utils import set_ws_protocol
 
 
 class AsyncClient:
-    """
-    The Client manages a websocket connection to handle messaging with a remote Rockets instance.
-
-    It runs in a thread and provides methods to send notifications and requests in JSON-RPC format.
-    """
+    """Asynchronous client implementation for asyncio event loop processing of JSON-RPC messages."""
 
     def __init__(self, url, subprotocols=None, loop=None):
         """
-        Initialize the Client, but don't setup the websocket connection yet.
+        Initialize the state of the client.
 
-        Convert the URL to a proper format and initialize the state of the client. Does not
-        establish the websocket connection yet. This will be postponed to either the first notify
-        or request.
+        Convert the URL to a proper format. Does not establish the websocket connection yet. This
+        will be postponed to the first notify or request.
 
-        :param str url: The address of the remote running Rockets instance.
+        :param str url: The address of the Rockets server.
         :param list subprotocols: The websocket protocols to use
         :param asyncio.AbstractEventLoop loop: Event loop where this client should run in
         """
@@ -71,12 +62,12 @@ class AsyncClient:
         if not self._loop:
             self._loop = asyncio.get_event_loop()
 
-        def ws_loop(observer):
+        def _ws_loop(observer):
             """Internal: synchronous wrapper for async _ws_loop"""
             asyncio.ensure_future(self._ws_loop(observer), loop=self._loop)
 
         # pylint: disable=E1101
-        self._ws_observable = Observable.create(ws_loop).publish().auto_connect()
+        self._ws_observable = Observable.create(_ws_loop).publish().auto_connect()
         # pylint: enable=E1101
 
         def _json_filter(value):
@@ -86,6 +77,7 @@ class AsyncClient:
             except ValueError:  # pragma: no cover
                 return False
 
+        # filter everything that is not JSON
         self._json_stream = self._ws_observable \
             .filter(lambda value: not isinstance(value, (bytes, bytearray, memoryview))) \
             .filter(_json_filter) \
@@ -93,9 +85,9 @@ class AsyncClient:
 
     def url(self):
         """
-        Returns the address of the remote running Rockets instance.
+        Returns the address of the connected Rockets server.
 
-        :return: The address of the remote running Rockets instance.
+        :return: The address of the connected Rockets server.
         :rtype: str
         """
         return self._url
@@ -104,7 +96,7 @@ class AsyncClient:
         """
         Returns the connection state of this client.
 
-        :return: true if the websocket is connected to the remote Rockets instance.
+        :return: true if the websocket is connected to the Rockets server.
         :rtype: bool
         """
         return True if self._ws and self._ws.open else False
@@ -114,21 +106,21 @@ class AsyncClient:
         Returns the websocket stream as an rx observable to subscribe to it.
 
         :return: the websocket observable
-        :rtype: rx.Observable
+        :rtype: :class:`rx.Observable`
         """
         return self._ws_observable
 
     def loop(self):
         """
-        Returns the event loop for this client.
+        Returns the event loop where this client is running in.
 
         :return: event loop
-        :rtype: asyncio.AbstractEventLoop
+        :rtype: :class:`asyncio.AbstractEventLoop`
         """
         return self._loop
 
     async def connect(self):
-        """Connect this client to the remote Rockets server"""
+        """Connect this client to the Rockets server"""
         if self.connected():
             return
 
@@ -136,7 +128,7 @@ class AsyncClient:
                                             loop=self._loop)
 
     async def disconnect(self):
-        """Disconnect this client from the remote Rockets server."""
+        """Disconnect this client from the Rockets server."""
         if not self.connected():
             return
 
@@ -144,7 +136,7 @@ class AsyncClient:
 
     async def send(self, message):
         """
-        Send any message to the connected remote Rockets server.
+        Send any message to the connected Rockets server.
 
         :param str message: The message to send
         """
@@ -153,7 +145,7 @@ class AsyncClient:
 
     async def notify(self, method, params):
         """
-        Invoke an RPC on the remote running Rockets instance without waiting for a response.
+        Invoke an RPC on the Rockets server without waiting for a response.
 
         :param str method: name of the method to invoke
         :param str params: params for the method
@@ -163,12 +155,12 @@ class AsyncClient:
 
     async def request(self, method, params=None):
         """
-        Invoke an RPC on the remote running Rockets instance.
+        Invoke an RPC on the Rockets server and returns its response.
 
         :param str method: name of the method to invoke
         :param dict params: params for the method
         :return: future object
-        :rtype: future
+        :rtype: :class:`asyncio.Future`
         """
         if params and not isinstance(params, (list, tuple, dict)):
             params = [params]
@@ -188,11 +180,11 @@ class AsyncClient:
 
     async def batch_request(self, requests):
         """
-        Invoke a batch RPC on the remote running Rockets instance.
+        Invoke a batch RPC on the Rockets server and return its response(s).
 
         :param list requests: list of requests and/or notifications to send as batch
-        :return: future object
-        :rtype: future
+        :return: future object with list of responses
+        :rtype: :class:`asyncio.Future`
         :raises TypeError: if methods and/or params are not a list
         :raises ValueError: if methods are empty
         """
@@ -226,12 +218,12 @@ class AsyncClient:
 
     def async_request(self, method, params=None):
         """
-        Invoke an RPC on the remote running Rockets instance and return the RequestTask.
+        Invoke an RPC on the Rockets server and return the :class:`RequestTask`.
 
         :param str method: name of the method to invoke
         :param dict params: params for the method
-        :return: RequestTask object
-        :rtype: RequestTask
+        :return: :class:`RequestTask` object
+        :rtype: :class:`RequestTask`
         """
         self._loop.set_task_factory(lambda loop, coro: RequestTask(coro=coro, loop=loop))
 
@@ -240,11 +232,11 @@ class AsyncClient:
 
     def async_batch_request(self, requests):
         """
-        Invoke a batch RPC on the remote running Rockets instance and return the RequestTask.
+        Invoke a batch RPC on the Rockets server and return the :class:`RequestTask`.
 
         :param list requests: list of requests and/or notifications to send as batch
-        :return: RequestTask object
-        :rtype: RequestTask
+        :return: :class:`RequestTask` object
+        :rtype: :class:`RequestTask`
         """
         self._loop.set_task_factory(lambda loop, coro: RequestTask(coro=coro, loop=loop))
 
@@ -254,6 +246,7 @@ class AsyncClient:
     async def _ws_loop(self, observer):
         """Internal: The loop for feeding an rxpy observer."""
         try:
+            await self.connect()
             async for message in self._ws:
                 observer.on_next(message)
             observer.on_completed()

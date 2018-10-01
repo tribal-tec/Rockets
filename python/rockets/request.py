@@ -22,17 +22,17 @@
 
 """A JSON-RPC 2.0 request"""
 
-import itertools
 from jsonrpc.jsonrpc2 import JSONRPC20Request
+from .utils import random_string
 
 
 class Request(JSONRPC20Request):
     """A JSON-RPC 2.0 request"""
 
-    _id_generator = itertools.count(0)
+    _id_generator = random_string()
 
     def __init__(self, method, params=None):
-        super().__init__(method=method, params=params, _id=next(self._id_generator),
+        super().__init__(method=method, params=params, _id=next(Request._id_generator),
                          is_notification=False)
 
     def request_id(self):
