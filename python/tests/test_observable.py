@@ -41,7 +41,7 @@ def setup():
     server_url = 'localhost:'+str(server.sockets[0].getsockname()[1])
 
 
-def test_subscribe():
+def test_subscribe_async_client():
     client = rockets.AsyncClient(server_url)
 
     received = asyncio.get_event_loop().create_future()
@@ -56,6 +56,19 @@ def test_subscribe():
 
     asyncio.get_event_loop().run_until_complete(_do_it())
     assert_equal(received.result(), 'Hello Rockets!')
+
+
+def test_subscribe():
+    client = rockets.Client(server_url)
+    client.connect()
+
+    def _on_message(message):
+        assert_equal(message, 'Hello Rockets!')
+        asyncio.get_event_loop().stop()
+
+    client.as_observable().subscribe(_on_message)
+    client.send("Rockets")
+    asyncio.get_event_loop().run_forever()
 
 
 if __name__ == '__main__':
