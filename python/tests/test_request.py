@@ -22,7 +22,6 @@
 
 import asyncio
 import websockets
-from jsonrpc.jsonrpc2 import JSONRPC20Request
 from jsonrpcserver.aio import methods
 from jsonrpcserver.response import RequestResponse
 import json
@@ -49,14 +48,14 @@ async def server_handle(websocket, path):
     json_request = json.loads(request)
     method = json_request['method']
     if method == 'test_progress':
-        progress_notification = JSONRPC20Request('progress', {
+        progress_notification = rockets.Request('progress', {
             'amount': 0.5,
             'operation': 'almost done',
-            'id': json_request['id']}, is_notification=True)
+            'id': json_request['id']})
         await websocket.send(progress_notification.json)
         response = RequestResponse(json_request['id'], 'DONE')
     elif method == 'test_cancel':
-        cancel_request = await websocket.recv()
+        await websocket.recv()
         response = RequestResponse(json_request['id'], 'CANCELLED')
     else:
         response = await methods.dispatch(request)

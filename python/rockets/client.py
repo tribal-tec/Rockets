@@ -120,19 +120,18 @@ class Client:
         self._verify_environment()
         return self._call_sync(self._client.request(method, params), response_timeout)
 
-    def batch_request(self, methods, params, response_timeout=5):
+    def batch_request(self, requests, response_timeout=5):
         """
         Invoke a batch RPC on the remote running Rockets instance and wait for its reponse.
 
-        :param list methods: name of the methods to invoke
-        :param list params: params for the methods
+        :param list requests: list of requests and/or notifications to send as batch
         :param int response_timeout: number of seconds to wait for the response
         :return: list of responses and/or errors of RPC
         :rtype: list
         :raises Exception: if request was not answered within given response_timeout
         """
         self._verify_environment()
-        return self._call_sync(self._client.batch_request(methods, params), response_timeout)
+        return self._call_sync(self._client.batch_request(requests), response_timeout)
 
     def async_request(self, method, params=None):
         """
@@ -145,16 +144,15 @@ class Client:
         """
         return self._async_client.async_request(method, params)
 
-    def async_batch_request(self, methods, params):
+    def async_batch_request(self, requests):
         """
         Invoke a batch RPC on the remote running Rockets instance and return the RequestTask.
 
-        :param list methods: name of the methods to invoke
-        :param list params: params for the methods
+        :param list requests: list of requests and/or notifications to send as batch
         :return: RequestTask object
         :rtype: RequestTask
         """
-        return self._async_client.async_batch_request(methods, params)
+        return self._async_client.async_batch_request(requests)
 
     def _verify_environment(self):
         if not self._thread and self._client.loop().is_running():

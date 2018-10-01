@@ -20,16 +20,13 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 # All rights reserved. Do not distribute without further notice.
 
-"""The Rockets python client implements JSONRPC to a Rockets server."""
+"""Bla"""
 
-from .async_client import AsyncClient
-from .client import Client
-from .notification import Notification
-from .request import Request
-from .request_error import RequestError
-from .request_progress import RequestProgress
-from .request_task import RequestTask
-from .version import VERSION as __version__
+from jsonrpc.jsonrpc2 import JSONRPC20Request
 
-__all__ = ['AsyncClient', 'Client', 'Notification', 'Request', 'RequestError', 'RequestProgress',
-           'RequestTask']
+
+class Notification(JSONRPC20Request):
+    """Bla """
+
+    def __init__(self, method, params=None):
+        super().__init__(method=method, params=params, is_notification=True)

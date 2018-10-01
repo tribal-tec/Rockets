@@ -27,13 +27,14 @@ It runs in a thread and provides methods to send notifications and requests in J
 """
 
 import asyncio
-import itertools
 import json
 
 import websockets
-from jsonrpc.jsonrpc2 import (JSONRPC20Request, JSONRPC20Response)
+from jsonrpc.jsonrpc2 import JSONRPC20Response
 from rx import Observable
 
+from .notification import Notification
+from .request import Request
 from .request_error import SOCKET_CLOSED_ERROR, RequestError
 from .request_progress import RequestProgress
 from .request_task import RequestTask
@@ -65,7 +66,6 @@ class AsyncClient:
         self._subprotocols = subprotocols
 
         self._ws = None
-        self._id_generator = itertools.count(0)
 
         self._loop = loop
         if not self._loop:
@@ -158,10 +158,7 @@ class AsyncClient:
         :param str method: name of the method to invoke
         :param str params: params for the method
         """
-        if params:
-            notification = JSONRPC20Request(method, params, is_notification=True)
-        else:
-            notification = JSONRPC20Request(method, is_notification=True)
+        notification = Notification(method, params)
         await self.send(notification.json)
 
     async def request(self, method, params=None):
@@ -173,53 +170,47 @@ class AsyncClient:
         :return: future object
         :rtype: future
         """
+        if params and not isinstance(params, (list, tuple, dict)):
+            params = [params]
+        request = Request(method, params)
         try:
-            request_id = next(self._id_generator)
-
-            if params:
-                if not isinstance(params, (list, tuple, dict)):
-                    params = [params]
-                request = JSONRPC20Request(method, params, _id=request_id)
-            else:
-                request = JSONRPC20Request(method, _id=request_id)
-
             response_future = self._loop.create_future()
 
             await self.connect()
-            self._setup_response_filter(response_future, request_id)
-            self._setup_progress_filter(response_future, request_id)
+            self._setup_response_filter(response_future, request.request_id())
+            self._setup_progress_filter(response_future, request.request_id())
 
             await self.send(request.json)
             await response_future
             return response_future.result()
         except asyncio.CancelledError:
-            await self.notify('cancel', {'id': request_id})
+            await self.notify('cancel', {'id': request.request_id()})
 
-    async def batch_request(self, methods, params):
+    async def batch_request(self, requests):
         """
         Invoke a batch RPC on the remote running Rockets instance.
 
-        :param list methods: name of the methods to invoke
-        :param list params: params for the methods
+        :param list requests: list of requests and/or notifications to send as batch
         :return: future object
         :rtype: future
         :raises TypeError: if methods and/or params are not a list
         :raises ValueError: if methods are empty
         """
-        if not isinstance(methods, list) and not isinstance(params, list):
-            raise TypeError('Not a list of methods')
-
-        if not methods:
+        if not requests:
             raise ValueError("Empty batch request not allowed")
-        try:
-            request_ids = list()
-            requests = list()
-            for method, param in zip(methods, params):
-                request_id = next(self._id_generator)
-                requests.append(JSONRPC20Request(method, param, _id=request_id).data)
-                request_ids.append(request_id)
 
-            request = JSONRPC20Request.from_data(requests)
+        for request in requests:
+            if not isinstance(request, Request):
+                raise TypeError('Not a valid JSONRPC request')
+
+        request_ids = list()
+        for request in requests:
+            request_ids.append(request.request_id())
+
+        try:
+            def _data(x):
+                return x.data
+            request = Request.from_data(list(map(_data, requests)))
 
             response_future = self._loop.create_future()
 
@@ -247,18 +238,17 @@ class AsyncClient:
         task = self.request(method, params)
         return asyncio.ensure_future(task, loop=self._loop)
 
-    def async_batch_request(self, methods, params):
+    def async_batch_request(self, requests):
         """
         Invoke a batch RPC on the remote running Rockets instance and return the RequestTask.
 
-        :param list methods: name of the methods to invoke
-        :param list params: params for the methods
+        :param list requests: list of requests and/or notifications to send as batch
         :return: RequestTask object
         :rtype: RequestTask
         """
         self._loop.set_task_factory(lambda loop, coro: RequestTask(coro=coro, loop=loop))
 
-        task = self.batch_request(methods, params)
+        task = self.batch_request(requests)
         return asyncio.ensure_future(task, loop=self._loop)
 
     async def _ws_loop(self, observer):
@@ -340,7 +330,7 @@ class AsyncClient:
                     value['params']['id'] == request_id
 
             def _to_progress(value):
-                progress = JSONRPC20Request.from_data(value).params
+                progress = Request.from_data(value).params
                 return RequestProgress(progress['operation'], progress['amount'])
 
             progress_observable = self._json_stream \

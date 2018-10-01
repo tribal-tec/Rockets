@@ -64,7 +64,9 @@ def setup():
 
 def test_batch():
     client = rockets.Client(server_url)
-    assert_equal(client.batch_request(['double', 'double'], [[2], [4]]), [4, 8])
+    request_1 = rockets.Request('double', [2])
+    request_2 = rockets.Request('double', [4])
+    assert_equal(client.batch_request([request_1, request_2]), [4, 8])
 
 
 @raises(TypeError)
@@ -81,7 +83,8 @@ def test_empty_request():
 
 def test_method_not_found():
     client = rockets.Client(server_url)
-    assert_equal(client.batch_request(['foo'], [['bar']]),
+    request = rockets.Request('foo', ['bar'])
+    assert_equal(client.batch_request([request]),
                  [{'code': -32601, 'message': 'Method not found'}])
 
 
@@ -90,12 +93,16 @@ def test_error_on_connection_lost():
     client = rockets.Client(server_url)
     # do one request, which closes the server, so the second request will throw an error
     assert_equal(client.request('ping'), 'pong')
-    client.batch_request(['double', 'double'], [[2], [4]])
+    request_1 = rockets.Request('double', [2])
+    request_2 = rockets.Request('double', [4])
+    client.batch_request([request_1, request_2])
 
 
 def test_cancel():
     client = rockets.AsyncClient(server_url)
-    request_task = client.async_batch_request(['test_cancel', 'test_cancel'], [[], []])
+    request_1 = rockets.Request('test_cancel')
+    request_2 = rockets.Request('test_cancel')
+    request_task = client.async_batch_request([request_1, request_2])
 
     def _on_done(value):
         assert_equal(value.result(), None)
