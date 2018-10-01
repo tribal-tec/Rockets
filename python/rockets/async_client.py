@@ -47,7 +47,7 @@ class AsyncClient:
     It runs in a thread and provides methods to send notifications and requests in JSON-RPC format.
     """
 
-    def __init__(self, url, loop=None):
+    def __init__(self, url, subprotocols=None, loop=None):
         """
         Initialize the Client, but don't setup the websocket connection yet.
 
@@ -56,9 +56,13 @@ class AsyncClient:
         or request.
 
         :param str url: The address of the remote running Rockets instance.
+        :param list subprotocols: The websocket protocols to use
         :param asyncio.AbstractEventLoop loop: Event loop where this client should run in
         """
         self._url = set_ws_protocol(url)
+        if not subprotocols:
+            subprotocols = ['rockets']
+        self._subprotocols = subprotocols
 
         self._ws = None
         self._id_generator = itertools.count(0)
@@ -128,7 +132,8 @@ class AsyncClient:
         if self.connected():
             return
 
-        self._ws = await websockets.connect(self._url, subprotocols=['rockets'], loop=self._loop)
+        self._ws = await websockets.connect(self._url, subprotocols=self._subprotocols,
+                                            loop=self._loop)
 
     async def disconnect(self):
         """Disconnect this client from the remote Rockets server."""

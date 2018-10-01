@@ -39,11 +39,12 @@ class Client:
     It runs in a thread and provides methods to send notifications and requests in JSON-RPC format.
     """
 
-    def __init__(self, url, loop=None):
+    def __init__(self, url, subprotocols=None, loop=None):
         """
         Bla
 
         :param str url: The address of the remote running Rockets instance.
+        :param list subprotocols: The websocket protocols to use
         :param asyncio.AbstractEventLoop loop: Event loop where this client should run in
         """
         if not loop:
@@ -60,11 +61,11 @@ class Client:
             self._thread.daemon = True
             self._thread.start()
 
-            self._client = AsyncClient(url, thread_loop)
-            self._async_client = AsyncClient(url, loop)
+            self._client = AsyncClient(url, subprotocols=subprotocols, loop=thread_loop)
+            self._async_client = AsyncClient(url, subprotocols=subprotocols, loop=loop)
         else:
             self._thread = None
-            self._client = AsyncClient(url, loop)
+            self._client = AsyncClient(url, subprotocols=subprotocols, loop=loop)
             self._async_client = self._client
 
     def url(self):
