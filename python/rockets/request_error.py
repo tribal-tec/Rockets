@@ -27,7 +27,6 @@ class RequestError(Exception):
     """Reports the error code and message of a request that has failed."""
 
     def __init__(self, code, message):
-        """Init base class and setup code and message"""
         super(RequestError, self).__init__(message)
 
         self.code = code

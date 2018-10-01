@@ -27,7 +27,6 @@ class RequestProgress:
     """Reports the operation and amount of a request."""
 
     def __init__(self, operation, amount):
-        """Setup operation and amount"""
         self.operation = operation
         self.amount = amount
 

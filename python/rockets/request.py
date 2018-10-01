@@ -20,14 +20,14 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 # All rights reserved. Do not distribute without further notice.
 
-"""Bla"""
+"""A JSON-RPC 2.0 request"""
 
 import itertools
 from jsonrpc.jsonrpc2 import JSONRPC20Request
 
 
 class Request(JSONRPC20Request):
-    """Bla """
+    """A JSON-RPC 2.0 request"""
 
     _id_generator = itertools.count(0)
 

@@ -20,13 +20,13 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 # All rights reserved. Do not distribute without further notice.
 
-"""Bla"""
+"""A JSON-RPC 2.0 notification"""
 
 from jsonrpc.jsonrpc2 import JSONRPC20Request
 
 
 class Notification(JSONRPC20Request):
-    """Bla """
+    """A JSON-RPC 2.0 notification"""
 
     def __init__(self, method, params=None):
         super().__init__(method=method, params=params, is_notification=True)
