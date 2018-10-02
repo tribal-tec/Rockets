@@ -40,19 +40,39 @@ async def ping():
 async def double(value):
     return value*2
 
+@methods.add
+async def foobar():
+    pass
+
 async def server_handle(websocket, path):
     request = await websocket.recv()
 
     json_request = json.loads(request)
-    if isinstance(json_request, list) and any(i['method'] == 'test_cancel' for i in json_request):
-        got_cancel.set_result(True)
-        response = BatchResponse()
-        for i in json_request:
-            response.append(RequestResponse(i['id'], ['CANCELLED']))
+    if isinstance(json_request, list):
+        if any(i['method'] == 'test_cancel' for i in json_request):
+            got_cancel.set_result(True)
+            response = BatchResponse()
+            for i in json_request:
+                response.append(RequestResponse(i['id'], ['CANCELLED']))
+        elif any(i['method'] == 'test_progress' for i in json_request):
+            response = BatchResponse()
+            for i in json_request:
+                progress_notification = rockets.Request('progress', {
+                    'amount': 0.5,
+                    'operation': 'almost done',
+                    'id': i['id']})
+                await websocket.send(progress_notification.json)
+                response.append(RequestResponse(i['id'], 'DONE'))
+        else:
+            response = await methods.dispatch(request)
     else:
         response = await methods.dispatch(request)
     if not response.is_notification:
         await websocket.send(str(response))
+
+async def server_handle_two_requests(websocket, path):
+    for i in range(2):
+        await server_handle(websocket, path)
 
 server_url = None
 def setup():
@@ -66,25 +86,26 @@ def test_batch():
     client = rockets.Client(server_url)
     request_1 = rockets.Request('double', [2])
     request_2 = rockets.Request('double', [4])
-    assert_equal(client.batch_request([request_1, request_2]), [4, 8])
+    notification = rockets.Notification('foobar')
+    assert_equal(client.batch([request_1, request_2, notification]), [4, 8])
 
 
 @raises(TypeError)
 def test_invalid_args():
     client = rockets.Client(server_url)
-    client.batch_request('foo', 'bar')
+    client.batch('foo', 'bar')
 
 
 @raises(ValueError)
 def test_empty_request():
     client = rockets.Client(server_url)
-    client.batch_request([], [])
+    client.batch([], [])
 
 
 def test_method_not_found():
     client = rockets.Client(server_url)
     request = rockets.Request('foo', ['bar'])
-    assert_equal(client.batch_request([request]),
+    assert_equal(client.batch([request]),
                  [{'code': -32601, 'message': 'Method not found'}])
 
 
@@ -95,14 +116,64 @@ def test_error_on_connection_lost():
     assert_equal(client.request('ping'), 'pong')
     request_1 = rockets.Request('double', [2])
     request_2 = rockets.Request('double', [4])
-    client.batch_request([request_1, request_2])
+    client.batch([request_1, request_2])
+
+
+def test_progress_single_request():
+    client = rockets.AsyncClient(server_url)
+    request = rockets.Request('test_progress')
+    request_task = client.async_batch([request])
+
+    class ProgressTracker:
+        def on_progress(self, progress):
+            assert_equal(progress.amount, 0.5)
+            assert_equal(progress.operation, 'Batch request')
+            assert_equal(str(progress), "('Batch request', 0.5)")
+            self.called = True
+
+    tracker = ProgressTracker()
+
+    request_task.add_progress_callback(tracker.on_progress)
+    assert_equal(asyncio.get_event_loop().run_until_complete(request_task), ['DONE'])
+    assert_true(tracker.called)
+
+
+def test_progress_multiple_requests():
+    start_test_server = websockets.serve(server_handle_two_requests, 'localhost')
+    test_server = asyncio.get_event_loop().run_until_complete(start_test_server)
+    client = rockets.AsyncClient('localhost:'+str(test_server.sockets[0].getsockname()[1]))
+    request_a = rockets.Request('test_progress')
+    request_b = rockets.Request('test_progress')
+    request_task = client.async_batch([request_a, request_b])
+
+    class ProgressTracker:
+        def __init__(self):
+            self._num_calls = 0
+
+        def on_progress(self, progress):
+            self._num_calls += 1
+            if self._num_calls == 1:
+                assert_equal(progress.amount, 0.25)
+                assert_equal(progress.operation, 'Batch request')
+                assert_equal(str(progress), "('Batch request', 0.25)")
+            elif self._num_calls == 2:
+                assert_equal(progress.amount, 0.5)
+                assert_equal(progress.operation, 'Batch request')
+                assert_equal(str(progress), "('Batch request', 0.5)")
+                self.called = True
+
+    tracker = ProgressTracker()
+
+    request_task.add_progress_callback(tracker.on_progress)
+    assert_equal(asyncio.get_event_loop().run_until_complete(request_task), ['DONE', 'DONE'])
+    assert_true(tracker.called)
 
 
 def test_cancel():
     client = rockets.AsyncClient(server_url)
     request_1 = rockets.Request('test_cancel')
     request_2 = rockets.Request('test_cancel')
-    request_task = client.async_batch_request([request_1, request_2])
+    request_task = client.async_batch([request_1, request_2])
 
     def _on_done(value):
         assert_equal(value.result(), None)

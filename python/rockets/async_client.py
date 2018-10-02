@@ -25,6 +25,7 @@
 import asyncio
 import json
 
+from functools import reduce
 import websockets
 from jsonrpc.jsonrpc2 import JSONRPC20Request, JSONRPC20Response
 from rx import Observable
@@ -209,6 +210,7 @@ class AsyncClient:
 
             await self.connect()
             self._setup_batch_response_filter(response_future, request_ids)
+            self._setup_batch_progress_filter(response_future, request_ids)
 
             await self.send(request.json)
             await response_future
@@ -326,6 +328,31 @@ class AsyncClient:
             def _to_progress(value):
                 progress = Request.from_data(value).params
                 return RequestProgress(progress['operation'], progress['amount'])
+
+            progress_observable = self._json_stream \
+                .filter(_progress_filter) \
+                .map(_to_progress) \
+                .subscribe(task._call_progress_callbacks)  # pylint: disable=W0212
+
+            def _done_callback(future):  # pylint: disable=W0613
+                progress_observable.dispose()
+
+            response_future.add_done_callback(_done_callback)
+
+    def _setup_batch_progress_filter(self, response_future, request_ids):
+        task = asyncio.Task.current_task()
+        items = dict()
+        if task and isinstance(task, RequestTask):
+            def _progress_filter(value):
+                return 'method' in value and value['method'] == 'progress' and \
+                    'params' in value and 'id' in value['params'] and \
+                    value['params']['id'] in request_ids
+
+            def _to_progress(value):
+                progress = Request.from_data(value).params
+                items[progress['id']] = progress['amount']
+                total = reduce((lambda x, value: x + value), items.values())
+                return RequestProgress('Batch request', total / len(request_ids))
 
             progress_observable = self._json_stream \
                 .filter(_progress_filter) \
