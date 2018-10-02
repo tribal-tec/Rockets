@@ -111,7 +111,7 @@ def test_subsequent_request():
     test_server = asyncio.get_event_loop().run_until_complete(start_test_server)
     client = rockets.Client('localhost:'+str(test_server.sockets[0].getsockname()[1]))
     assert_equal(client.request('ping'), 'pong')
-    assert_equal(client.request('ping'), 'pong')
+    assert_equal(client.request('double', 2), 4)
 
 
 def test_progress():

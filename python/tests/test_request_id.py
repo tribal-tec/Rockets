@@ -20,10 +20,16 @@
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 # All rights reserved. Do not distribute without further notice.
 
+from nose.tools import assert_equal, assert_not_equal
+from rockets import Request
 
-def test_import_rockets():
-    try:
-        import rockets
-        return True
-    except Exception:
-        return False
+
+def test_request_id_length():
+    request = Request('foo')
+    assert_equal(len(request.request_id()), 8)
+
+
+def test_request_ids_different():
+    request_a = Request('foo')
+    request_b = Request('bar')
+    assert_not_equal(request_a.request_id(), request_b.request_id())
