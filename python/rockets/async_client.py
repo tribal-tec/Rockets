@@ -145,7 +145,7 @@ class AsyncClient:
 
     async def notify(self, method, params):
         """
-        Invoke an RPC on the Rockets server without waiting for a response.
+        Invoke an RPC on the Rockets server without expecting a response.
 
         :param str method: name of the method to invoke
         :param str params: params for the method

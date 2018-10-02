@@ -6,8 +6,7 @@
 Rockets python client
 ====================
 
-The Rockets python client library provides access to remote control a running Rockets instance using
-websockets and HTTP requests messaging.
+A small client for Rockets using JSON-RPC as communication contract over a WebSocket.
 
 .. toctree::
    :maxdepth: 2
