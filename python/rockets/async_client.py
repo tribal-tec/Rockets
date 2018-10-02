@@ -26,7 +26,7 @@ import asyncio
 import json
 
 import websockets
-from jsonrpc.jsonrpc2 import JSONRPC20Response
+from jsonrpc.jsonrpc2 import JSONRPC20Request, JSONRPC20Response
 from rx import Observable
 
 from .notification import Notification
@@ -178,7 +178,7 @@ class AsyncClient:
         except asyncio.CancelledError:
             await self.notify('cancel', {'id': request.request_id()})
 
-    async def batch_request(self, requests):
+    async def batch(self, requests):
         """
         Invoke a batch RPC on the Rockets server and return its response(s).
 
@@ -192,12 +192,13 @@ class AsyncClient:
             raise ValueError("Empty batch request not allowed")
 
         for request in requests:
-            if not isinstance(request, Request):
+            if not isinstance(request, JSONRPC20Request):
                 raise TypeError('Not a valid JSONRPC request')
 
         request_ids = list()
         for request in requests:
-            request_ids.append(request.request_id())
+            if isinstance(request, Request):
+                request_ids.append(request.request_id())
 
         try:
             def _data(x):
@@ -230,7 +231,7 @@ class AsyncClient:
         task = self.request(method, params)
         return asyncio.ensure_future(task, loop=self._loop)
 
-    def async_batch_request(self, requests):
+    def async_batch(self, requests):
         """
         Invoke a batch RPC on the Rockets server and return the :class:`RequestTask`.
 
@@ -240,7 +241,7 @@ class AsyncClient:
         """
         self._loop.set_task_factory(lambda loop, coro: RequestTask(coro=coro, loop=loop))
 
-        task = self.batch_request(requests)
+        task = self.batch(requests)
         return asyncio.ensure_future(task, loop=self._loop)
 
     async def _ws_loop(self, observer):

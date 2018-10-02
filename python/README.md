@@ -1,58 +1,160 @@
-# Rockets
+# Rockets Python Client
 
-The rockets package provides a python API to the Rockets websocket server.
+> A small client for [Rockets](../README.md) using [JSON-RPC](https://www.jsonrpc.org) as
+> communication contract over a [WebSocket](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket).
 
-## Documentation
-
-Rockets documentation is built and hosted on [readthedocs](https://readthedocs.org/).
-
-* [latest snapshot](http://rockets.readthedocs.org/en/latest/)
-* [latest release](http://rockets.readthedocs.org/en/stable/)
-
-## Installation
-
-It is recommended that you use [`pip`](https://pip.pypa.io/en/stable/) to install
-`Rockets` into a [`virtualenv`](https://virtualenv.pypa.io/en/stable/). The following
-assumes a `virtualenv` named `venv` has been set up and
-activated. We will see three ways to install `Rockets`
+[![Travis (.org) branch](https://img.shields.io/travis/BlueBrain/Rockets/master.svg?style=flat-square)](https://github.com/BlueBrain/Rockets)
 
 
-### 1. From the Python Package Index
+# Table of Contents
 
-```
-(venv)$ pip install rockets
-```
+- [Rockets Python Client](#rockets-python-client)
+- [Table of Contents](#table-of-contents)
+        - [Installation](#installation)
+        - [Usage](#usage)
+            - [Connection](#connection)
+            - [Notifications](#notifications)
+            - [Requests](#requests)
+            - [Batching](#batching)
 
-### 2. From git repository
 
-```
-(venv)$ pip install git+https://github.com/Rockets/Rockets.git#subdirectory=python
+### Installation
+----------------
+You can install this package from [PyPI](https://pypi.org/):
+```bash
+pip install rockets
 ```
 
-### 3. From source
+### Usage
+---------
 
-Clone the repository and install it:
+#### Connection
+Create a client and connect:
+```py
+from rockets import Client
 
-```
-(venv)$ git clone https://github.com/Rockets/Rockets.git
-(venv)$ pip install -e ./Rockets/python
-```
+# client does not connect during __init__;
+# either explicit or on any notify/request/send
+client = Client('myhost:8080')
 
-This installs `Rockets` into your `virtualenv` in "editable" mode. That means changes
-made to the source code are seen by the installation. To install in read-only mode, omit
-the `-e`.
-
-## Connect to running Rockets instance
-
-```python
->>> from rockets import Client
-
->>> rockets = Client('localhost:8200')
->>> print(rockets)
-Rockets client version 0.7.0.c52dd4b running on http://localhost:8200/
+client.connect()
+print(client.connected())
 ```
 
-## Examples
+Close the connection with the socket cleanly:
+```py
+from rockets import Client
 
-Please find some examples how to interact with Rockets from python on
-[`Read the Docs`](https://rockets.readthedocs.io/en/latest/examples.html).
+client = Client('myhost:8080')
+
+client.connect()
+client.disconnect();
+print(client.connected())
+```
+
+
+#### Notifications
+Listen to server notifications:
+```py
+from rockets import Client
+
+client = Client('myhost:8080')
+
+client.as_observable().subscribe(lambda msg: print("Got message:", msg))
+```
+
+Send notifications:
+```py
+from rockets import Client
+
+client = Client('myhost:8080')
+
+client.notify('mymethod', {'ping': True})
+```
+
+
+#### Requests
+Make a synchronous, blocking request:
+```py
+from rockets import Client
+
+client = Client('myhost:8080')
+
+response = client.request('mymethod', {'ping': True})
+print(response)
+```
+
+Make an asynchronous request using `asyncio`:
+```py
+import asyncio
+from rockets import Client
+
+client = Client('myhost:8080')
+
+request_task = client.async_request('mymethod', {'ping': True})
+asyncio.get_event_loop().run_until_complete(request_task)
+print(request_task.result())
+```
+
+Handle a request error:
+```py
+from rockets import Client, RequestError
+
+client = Client('myhost:8080')
+
+try:
+    client.request('mymethod')
+except RequestError as err:
+    print(err.code, err.message)
+```
+
+**NOTE**: Any error that may occur will be a `RequestError`.
+
+Cancel a request:
+```py
+from rockets import Client
+
+client = Client('myhost:8080')
+
+request_task = client.async_request('mymethod')
+request_task.cancel();
+```
+
+Get progress updates for a request:
+```py
+from rockets import Client
+
+client = Client('myhost:8080')
+
+request_task = client.async_request('mymethod')
+request_task.add_progress_callback(lambda progress: print(progress))
+```
+
+**NOTE**: The progress object is of type `RequestProgress`.
+
+#### Batching
+Make a batch request:
+```py
+from rockets import Client, Request, Notification
+
+client = Client('myhost:8080')
+
+request = Request('myrequest');
+notification = Notification('mynotify');
+responses = client.batch([request, notification])
+
+for response in responses:
+    print(response)
+```
+
+Cancel a batch request:
+```py
+from rockets import Client
+
+client = Client('myhost:8080')
+
+request = Request('myrequest');
+notification = Notification('mynotify');
+request_task = client.async_batch([request, notification])
+request_task.cancel();
+```

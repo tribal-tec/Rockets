@@ -122,7 +122,7 @@ class TestClass():
         asyncio.get_event_loop().run_until_complete(run_notebook_cell())
         assert_equal(asyncio.get_event_loop().run_until_complete(called), 'pong')
 
-    def test_async_batch_request(self):
+    def test_async_batch(self):
         called = asyncio.get_event_loop().create_future()
         def _on_done(the_task):
             called.set_result(the_task.result())
@@ -132,7 +132,7 @@ class TestClass():
             client = rockets.Client('ws://'+self.server_url)
             request_1 = rockets.Request('double', [2])
             request_2 = rockets.Request('double', [4])
-            task = client.async_batch_request([request_1, request_2])
+            task = client.async_batch([request_1, request_2])
             task.add_done_callback(_on_done)
             await task
 

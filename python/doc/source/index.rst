@@ -4,7 +4,7 @@
    contain the root `toctree` directive.
 
 Rockets python client
-====================
+=====================
 
 A small client for Rockets using JSON-RPC as communication contract over a WebSocket.
 

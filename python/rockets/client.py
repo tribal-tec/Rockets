@@ -105,22 +105,22 @@ class Client:
         self._verify_environment()
         return self._call_sync(self._client.request(method, params), response_timeout)
 
-    @copydoc(AsyncClient.batch_request)
-    def batch_request(self, requests, response_timeout=None):  # noqa: D102,D205 pylint: disable=C0111,W9011,W9012,W9015,W9016
+    @copydoc(AsyncClient.batch)
+    def batch(self, requests, response_timeout=None):  # noqa: D102,D205 pylint: disable=C0111,W9011,W9012,W9015,W9016
         """
         :param int response_timeout: number of seconds to wait for the response
         :raises TimeoutError: if request was not answered within given response_timeout
         """
         self._verify_environment()
-        return self._call_sync(self._client.batch_request(requests), response_timeout)
+        return self._call_sync(self._client.batch(requests), response_timeout)
 
     @copydoc(AsyncClient.async_request)
     def async_request(self, method, params=None):  # noqa: D102 pylint: disable=missing-docstring
         return self._async_client.async_request(method, params)
 
-    @copydoc(AsyncClient.async_batch_request)
-    def async_batch_request(self, requests):  # noqa: D102 pylint: disable=missing-docstring
-        return self._async_client.async_batch_request(requests)
+    @copydoc(AsyncClient.batch)
+    def async_batch(self, requests):  # noqa: D102 pylint: disable=missing-docstring
+        return self._async_client.async_batch(requests)
 
     def _verify_environment(self):
         if not self._thread and self._client.loop().is_running():
