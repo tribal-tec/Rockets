@@ -102,7 +102,7 @@ class AsyncClient:
         :return: true if the websocket is connected to the Rockets server.
         :rtype: bool
         """
-        return True if self._ws and self._ws.open else False
+        return bool(self._ws and self._ws.open)
 
     async def connect(self):
         """Connect this client to the Rockets server"""

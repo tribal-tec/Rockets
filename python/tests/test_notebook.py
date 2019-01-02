@@ -95,14 +95,15 @@ class TestClass():
         client = rockets.Client('ws://'+self.server_url)
 
         async def run_notebook_cell(client):
-            try:
-                client.request('ping')
-                return False
-            except RuntimeError:
-                return True
+             client.request('ping')
 
-        called = asyncio.get_event_loop().run_until_complete(run_notebook_cell(client))
-        assert_true(called)
+        try:
+            asyncio.get_event_loop().run_until_complete(run_notebook_cell(client))
+            got_exception = False
+        except RuntimeError:
+            got_exception = True
+
+        assert_true(got_exception)
 
         # unblock server thread
         client.notify('hello')

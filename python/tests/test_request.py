@@ -141,7 +141,7 @@ def test_cancel():
         asyncio.get_event_loop().stop()
 
     async def _do_cancel():
-        asyncio.sleep(10)
+        await asyncio.sleep(10)
         request_task.cancel()
 
     request_task.add_done_callback(_on_done)
