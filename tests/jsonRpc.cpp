@@ -21,7 +21,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include "rockets/json.hpp"
+#include "../rockets/src/json.hpp"
 #include "rockets/jsonrpc/receiver.h"
 
 // Validation examples based on: http://www.jsonrpc.org/specification

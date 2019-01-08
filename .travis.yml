@@ -15,7 +15,10 @@ matrix:
       before_install:
         - ./scripts/install_requirements.sh
       script:
-        - ./scripts/build_lib.sh
+        - ./scripts/build_lib.sh -DCOVERAGE=1
+      after_success:
+        - cd ${BUILD_TYPE}
+        - ../scripts/codecov.sh
     # C++ Release
     - language: cpp
       os: osx

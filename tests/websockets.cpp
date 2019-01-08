@@ -28,7 +28,7 @@
 #include <boost/mpl/vector.hpp>
 #include <boost/test/unit_test.hpp>
 
-#include <libwebsockets.h>
+#include <lws_config.h>
 
 #define CLIENT_SUPPORTS_INEXISTANT_PROTOCOL_ERRORS \
     (LWS_LIBRARY_VERSION_NUMBER >= 2000000)
@@ -65,6 +65,7 @@ struct ScopedEnvironment
         setenv(key.c_str(), value.c_str(), 0);
     }
     ~ScopedEnvironment() { unsetenv(_key.c_str()); }
+
 private:
     std::string _key;
 };

@@ -32,7 +32,7 @@
 #include <rockets/jsonrpc/server.h>
 #include <rockets/server.h>
 
-#include "rockets/json.hpp"
+#include "../rockets/src/json.hpp"
 
 #include <cstdio> // std::snprintf
 #include <iostream>

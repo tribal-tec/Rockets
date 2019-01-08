@@ -20,9 +20,9 @@
 #ifndef ROCKETS_HTTP_CONNECTION_HANDLER_H
 #define ROCKETS_HTTP_CONNECTION_HANDLER_H
 
-#include <rockets/http/connection.h>
+#include "connection.h"
+#include "registry.h"
 #include <rockets/http/filter.h>
-#include <rockets/http/registry.h>
 #include <rockets/http/types.h>
 
 namespace rockets

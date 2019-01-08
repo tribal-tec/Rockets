@@ -89,7 +89,7 @@ private:
     void sendText(std::string message);
     void handleText(ws::MessageCallback callback_) { callback = callback_; }
 };
-}
-}
+} // namespace jsonrpc
+} // namespace rockets
 
 #endif

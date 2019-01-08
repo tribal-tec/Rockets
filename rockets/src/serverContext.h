@@ -17,13 +17,13 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef ROCKETS_CLIENTCONTEXT_H
-#define ROCKETS_CLIENTCONTEXT_H
+#ifndef ROCKETS_SERVERCONTEXT_H
+#define ROCKETS_SERVERCONTEXT_H
 
+#include "pollDescriptors.h"
+#include "utils.h"
+#include "wrappers.h"
 #include <rockets/http/types.h>
-#include <rockets/pollDescriptors.h>
-#include <rockets/utils.h>
-#include <rockets/wrappers.h>
 #include <rockets/ws/types.h>
 
 #include <libwebsockets.h>
@@ -31,42 +31,43 @@
 #include <string>
 #include <vector>
 
-#if LWS_LIBRARY_VERSION_NUMBER >= 2000000
-#define CLIENT_USE_EXPLICIT_VHOST 1
-#endif
-
 namespace rockets
 {
 /**
- * Common context for http and websockets clients.
+ * Server context for http and websockets protocols.
  */
-class ClientContext
+class ServerContext
 {
 public:
-    ClientContext(lws_callback_function* callback, void* user);
+    ServerContext(const std::string& uri, const std::string& name,
+                  const unsigned int threadCount,
+                  lws_callback_function* callback,
+                  lws_callback_function* wsCallback, void* user,
+                  void* uvLoop = nullptr);
 
-    lws* startHttpRequest(http::Method method, const std::string& uri);
+    std::string getHostname() const;
+    uint16_t getPort() const;
+    int getThreadCount() const;
 
-    std::unique_ptr<ws::Connection> connect(const std::string& uri,
-                                            const std::string& protocol);
+    void requestBroadcast();
 
+    bool service(int tsi, int timeout_ms);
     void service(int timeout_ms);
     void service(PollDescriptors& pollDescriptors, SocketDescriptor fd,
                  int events);
+    void cancelService();
 
 private:
+    std::string interface;
     lws_context_creation_info info;
-    std::string wsProtocolName{"default"};
     std::vector<lws_protocols> protocols;
+    std::string wsProtocolName;
     LwsContextPtr context;
-#if CLIENT_USE_EXPLICIT_VHOST
-    lws_vhost* vhost = nullptr;
-#endif
 
-    lws_client_connect_info makeConnectInfo(const Uri& uri) const;
-    void createContext();
-    void createVhost();
-    void disableProxy();
+    void fillContextInfo(const std::string& uri,
+                         const unsigned int threadCount);
+    void createWebsocketsProtocol(lws_callback_function* wsCallback,
+                                  void* user);
 };
 }
 

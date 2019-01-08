@@ -20,8 +20,8 @@
 #ifndef ROCKETS_HTTP_CONNECTION_H
 #define ROCKETS_HTTP_CONNECTION_H
 
-#include <rockets/http/channel.h>
-#include <rockets/http/cors.h>
+#include "channel.h"
+#include "cors.h"
 #include <rockets/http/request.h>
 #include <rockets/http/types.h>
 

@@ -31,7 +31,7 @@
 #include <rockets/http/response.h>
 #include <rockets/server.h>
 
-#include <libwebsockets.h>
+#include <lws_config.h>
 
 #include <iostream>
 #include <map>
@@ -98,6 +98,7 @@ public:
     bool getCalled() const { return _called; }
     void setCalled(const bool called = true) { _called = called; }
     std::string getEndpoint() const { return "test/foo"; }
+
 private:
     bool _notified = false;
     mutable bool _called = false;
@@ -160,6 +161,7 @@ struct ScopedEnvironment
         setenv(key.c_str(), value.c_str(), 0);
     }
     ~ScopedEnvironment() { unsetenv(_key.c_str()); }
+
 private:
     std::string _key;
 };
@@ -213,8 +215,8 @@ std::ostream& operator<<(std::ostream& oss, const Response& response)
     oss << "]" << std::endl;
     return oss;
 }
-}
-}
+} // namespace http
+} // namespace rockets
 
 /**
  * Fixtures to run all test cases with {0, 1, 2} server worker threads.
@@ -671,8 +673,8 @@ BOOST_FIXTURE_TEST_CASE_TEMPLATE(handle_headers, F, Fixtures, F)
         {http::Header::LAST_MODIFIED, modified},
         {http::Header::LOCATION, location},
         {http::Header::RETRY_AFTER, retry}};
-    const http::Response expectedResponse{http::Code::OK, "path/suffix:",
-                                          expectedHeaders};
+    const http::Response expectedResponse{http::Code::OK,
+                                          "path/suffix:", expectedHeaders};
 
     for (int method = 0; method < int(http::Method::ALL); ++method)
     {

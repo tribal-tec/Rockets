@@ -16,15 +16,31 @@
 # along with this library; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-if(NOT BOOST_FOUND)
-  return()
+set(TEST_FILES
+  http.cpp
+  jsonRpc.cpp
+  jsonRpcAsync.cpp
+  jsonRpcCancellable.cpp
+  jsonRpcClientServer.cpp
+  websockets.cpp
+)
+if(${Libwebsockets_VERSION} VERSION_GREATER 2.0.0)
+  list(APPEND TEST_FILES jsonRpcHttp.cpp)
 endif()
 
-if(${Libwebsockets_VERSION} VERSION_LESS 2.1.0)
-  set(EXCLUDE_FROM_TESTS jsonRpcHttp.cpp)
-endif()
+function(add_boost_test SOURCE_FILE_NAME)
+  get_filename_component(TEST_EXECUTABLE_NAME ${SOURCE_FILE_NAME} NAME_WE)
+  if(TARGET ${TEST_EXECUTABLE_NAME})
+    set(TEST_EXECUTABLE_NAME Rockets-${TEST_EXECUTABLE_NAME})
+  endif()
 
-set(TEST_LIBRARIES ${Boost_UNIT_TEST_FRAMEWORK_LIBRARY} Rockets)
+  add_executable(${TEST_EXECUTABLE_NAME} ${SOURCE_FILE_NAME})
+  target_compile_definitions(${TEST_EXECUTABLE_NAME} PRIVATE -DBOOST_TEST_DYN_LINK)
+  target_link_libraries(${TEST_EXECUTABLE_NAME} Rockets Boost::unit_test_framework)
 
-list(APPEND LCOV_EXCLUDE '${PROJECT_SOURCE_DIR}/rockets/json.hpp')
-include(CommonCTest)
+  add_test(NAME ${TEST_EXECUTABLE_NAME} COMMAND ${TEST_EXECUTABLE_NAME})
+endfunction()
+
+foreach(FILE ${TEST_FILES})
+  add_boost_test(${FILE})
+endforeach()

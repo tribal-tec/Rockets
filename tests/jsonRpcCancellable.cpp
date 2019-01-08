@@ -21,7 +21,7 @@
 
 #include <boost/test/unit_test.hpp>
 
-#include "rockets/json.hpp"
+#include "../rockets/src/json.hpp"
 #include "rockets/jsonrpc/cancellableReceiver.h"
 
 #include <iostream>

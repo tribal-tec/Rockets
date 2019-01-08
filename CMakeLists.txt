@@ -16,56 +16,52 @@
 # along with this library; if not, write to the Free Software Foundation, Inc.,
 # 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 
-cmake_minimum_required(VERSION 3.1 FATAL_ERROR)
-project(Rockets VERSION 1.0.0)
-set(Rockets_VERSION_ABI 1)
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
+project(Rockets VERSION 1.0.0 LANGUAGES CXX)
 
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/CMake/common)
-if(NOT EXISTS ${CMAKE_SOURCE_DIR}/CMake/common/Common.cmake)
-  message(FATAL_ERROR "CMake/common missing, run: git submodule update --init")
-endif()
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(ROCKETS_DEB_DEPENDS libboost-test-dev libwebsockets-dev libuv1-dev)
-set(ROCKETS_PORT_DEPENDS libwebsockets)
-
-# disable noisy warnings from ChoosePython
-set(CHOOSE_PYTHON_DONE ON)
-include(FindBoostConfig)
-
-include(Common)
-
-set(ROCKETS_DESCRIPTION "Rockets - REST and websockets C++ library")
-set(ROCKETS_MAINTAINER "Blue Brain Project <bbp-open-source@googlegroups.com>")
-set(ROCKETS_LICENSE LGPL)
-
-common_find_package(Boost SYSTEM COMPONENTS unit_test_framework)
-if(APPLE)
-  common_find_package(OpenSSL REQUIRED) # libwebsockets depends on that
-endif()
-common_find_package(Libwebsockets SYSTEM)
+find_package(Boost QUIET COMPONENTS unit_test_framework)
+find_package(OpenSSL QUIET REQUIRED) # libwebsockets depends on that
+find_package(Libwebsockets QUIET)
 if(NOT Libwebsockets_FOUND) # Ubuntu package only has libwebsockets.pc
-  common_find_package_disable(Libwebsockets)
-  common_find_package(libwebsockets SYSTEM REQUIRED)
-  set(Libwebsockets_VERSION ${libwebsockets_VERSION})
+  find_package(PkgConfig QUIET REQUIRED)
+  pkg_check_modules(Libwebsockets libwebsockets QUIET REQUIRED)
 endif()
-common_find_package(Threads REQUIRED)
-common_find_package_post()
+find_package(Threads QUIET REQUIRED)
 
-set(ROCKETS_DEPENDENT_LIBRARIES Threads)
+# build a proper libwebsockets target
+if(Libwebsockets_VERSION AND NOT TARGET libwebsockets)
+  add_library(libwebsockets INTERFACE IMPORTED)
+  if(APPLE) # add homebrew include dir
+    list(APPEND _libwebsockets_include_dirs /usr/local/include)
+  endif()
+  list(APPEND _libwebsockets_include_dirs ${OPENSSL_INCLUDE_DIR})
+  set_target_properties(libwebsockets PROPERTIES
+    INTERFACE_INCLUDE_DIRECTORIES "${_libwebsockets_include_dirs}"
+    INTERFACE_LINK_LIBRARIES websockets
+  )
+endif()
+
+add_subdirectory(rockets)
 
 option(ROCKETS_BUILD_APPLICATIONS "Build example applications" ON)
-
 if(ROCKETS_BUILD_APPLICATIONS)
   add_subdirectory(apps)
 endif()
-add_subdirectory(rockets)
-add_subdirectory(tests)
 
-set(CPACK_PACKAGE_DESCRIPTION_FILE "${PROJECT_SOURCE_DIR}/README.md")
-set(ROCKETS_PACKAGE_DEB_DEPENDS libwebsockets-dev)
-include(CommonCPack)
+if(TARGET Boost::unit_test_framework)
+  include(CTest)
+  enable_testing()
+  add_subdirectory(tests)
+endif()
 
-set(COMMON_PROJECT_DOMAIN ch.epfl.bluebrain)
-set(DOXYGEN_MAINPAGE_MD README.md)
-set(DOXYGEN_EXTRA_INPUT ${PROJECT_SOURCE_DIR}/README.md)
-include(DoxygenRule)
+#set(CPACK_PACKAGE_DESCRIPTION_FILE "${PROJECT_SOURCE_DIR}/README.md")
+#set(ROCKETS_PACKAGE_DEB_DEPENDS libwebsockets-dev)
+#include(CommonCPack)
+
+#set(COMMON_PROJECT_DOMAIN ch.epfl.bluebrain)
+#set(DOXYGEN_MAINPAGE_MD README.md)
+#set(DOXYGEN_EXTRA_INPUT ${PROJECT_SOURCE_DIR}/README.md)
+#include(DoxygenRule)

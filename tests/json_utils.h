@@ -17,7 +17,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include <rockets/json.hpp>
+#include "../rockets/src/json.hpp"
 
 /** Format a JSON string exactly as Rockets does it for string comparison. */
 template <typename T>

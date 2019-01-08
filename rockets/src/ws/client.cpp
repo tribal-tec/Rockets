@@ -17,7 +17,7 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "client.h"
+#include <rockets/ws/client.h>
 
 #include "../clientContext.h"
 #include "../pollDescriptors.h"

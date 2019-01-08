@@ -19,9 +19,9 @@
 
 #include "connectionHandler.h"
 
-#include "helpers.h"
 #include "request.h"
 #include "response.h"
+#include <rockets/http/helpers.h>
 
 namespace
 {

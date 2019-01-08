@@ -1,5 +1,5 @@
-/* Copyright (c) 2017, EPFL/Blue Brain Project
- *                     Raphael.Dumusc@epfl.ch
+/* Copyright (c) 2017-2018, EPFL/Blue Brain Project
+ *                          Raphael.Dumusc@epfl.ch
  *
  * This file is part of Rockets <https://github.com/BlueBrain/Rockets>
  *
@@ -17,40 +17,18 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#ifndef ROCKETS_SERVICETHREADPOOL_H
-#define ROCKETS_SERVICETHREADPOOL_H
+#include "notifier.h"
 
-#include <atomic>
-#include <thread>
-#include <vector>
-
-#include <rockets/serverContext.h>
+#include <rockets/jsonrpc/helpers.h>
 
 namespace rockets
 {
-/**
- * Service thread pool for the server.
- */
-class ServiceThreadPool
+namespace jsonrpc
 {
-public:
-    ServiceThreadPool(ServerContext& context);
-    ~ServiceThreadPool();
-
-    size_t getSize() const;
-    void requestBroadcast();
-
-private:
-    ServerContext& context;
-    std::vector<std::thread> serviceThreads;
-    std::unique_ptr<std::atomic_bool[]> broadcastRequested;
-    std::atomic_bool exitService{false};
-
-    void handleBroadcastRequest(int tsi);
-
-    void start();
-    void stop();
-};
+void Notifier::notify(const std::string& method, const std::string& params)
+{
+    _send(params.empty() ? makeNotification(method)
+                         : makeNotification(method, params));
 }
-
-#endif
+}
+}

@@ -9,8 +9,6 @@ cd $BUILD_TYPE
 cmake -GNinja \
     -DCMAKE_INSTALL_PREFIX=$PWD/install \
     -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-    ..
+    $@ ..
 
-ninja all && \
-    ninja $PROJECT_NAME-tests && \
-    ninja install
+ninja && ninja install && ctest

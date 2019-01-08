@@ -20,7 +20,7 @@
 #ifndef ROCKETS_HTTP_REQUEST_HANDLER_H
 #define ROCKETS_HTTP_REQUEST_HANDLER_H
 
-#include <rockets/http/channel.h>
+#include "channel.h"
 #include <rockets/http/types.h>
 
 #include <lws_config.h>

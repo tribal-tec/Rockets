@@ -22,7 +22,7 @@
 #ifndef ROCKETS_HTTP_REGISTRY_H
 #define ROCKETS_HTTP_REGISTRY_H
 
-#include "types.h"
+#include <rockets/http/types.h>
 
 #include <array>
 #include <map>
